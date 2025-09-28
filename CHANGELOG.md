@@ -1,11 +1,21 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
-## [v1.4.2](https://github.com/76creates/stickers/compare/v1.4.1...v1.4.2) (2024-11-26)
+## [v1.4.2](https://github.com/76creates/stickers/compare/v1.4.1...v1.4.2) (2025-09-29)
+### ⚠ BREAKING CHANGES
+- `TableStyleKey` is now `StyleKey`, and names of the keys better reflect their purpose within their package
+- `TableSorting*` is now `SortingOrder*`, and use `SortingOrder` as type.
+- Updated table package errors to have `Error` prefix instead of `Table` as a prefix, and `Error` as a suffix.
+- Removed `TableSingleType`, generic table should be used.
 ### Fixes
-- Fix typo in flexbox/Cell.SetMinHeight
+- Fix typo in flexbox/Cell.SetMinHeight. #18 @tvanriel
+- Fixed `flex-box-with-table` example to use new sorting functions.
+- Refactored table go files.
 ### Deprecations
-- `Cell.SetMinHeigth` is now deprecated in favour of SetMinHeight.
+- `Cell.SetMinHeigth` is now deprecated in favour of SetMinHeight. #18 @tvanriel
+### Features
+- Added `x-scrolling` to the table, and refactored some mechanics to accommodate for this change.
+- Added cell `ContentGenerator` functions that can be used to generate cell content with dimension context.
 
 ## [v1.4.1](https://github.com/76creates/stickers/compare/v1.4.0...v1.4.1) (2024-10-21)
 ### Features
