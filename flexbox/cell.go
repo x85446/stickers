@@ -64,6 +64,9 @@ func (r *Cell) SetContentGenerator(generator func(maxX, maxY int) string) *Cell 
 
 // GetContent returns the cells raw content
 func (r *Cell) GetContent() string {
+	if r.contentGenerator == nil {
+		return ""
+	}
 	return r.contentGenerator(r.getMaxWidth(), r.getMaxHeight())
 }
 
