@@ -67,7 +67,7 @@ func (r *Cell) GetContent() string {
 	if r.contentGenerator == nil {
 		return ""
 	}
-	return r.contentGenerator(r.getMaxWidth(), r.getMaxHeight())
+	return r.contentGenerator(r.getContentWidth(), r.getContentHeight())
 }
 
 // SetMinWidth sets the cells minimum width, this will not disable responsivness.
@@ -104,12 +104,16 @@ func (r *Cell) GetStyle() lipgloss.Style {
 	return r.style
 }
 
-// GetWidth returns real width of the cell
+// GetWidth returns the full allocated width of the cell including borders, padding, and margins.
+// For dimension-aware content that needs to fit within the cell's content area,
+// use SetContentGenerator() which receives content dimensions automatically.
 func (r *Cell) GetWidth() int {
 	return r.getMaxWidth()
 }
 
-// GetHeight returns real height of the cell
+// GetHeight returns the full allocated height of the cell including borders, padding, and margins.
+// For dimension-aware content that needs to fit within the cell's content area,
+// use SetContentGenerator() which receives content dimensions automatically.
 func (r *Cell) GetHeight() int {
 	return r.getMaxHeight()
 }
@@ -143,11 +147,11 @@ func (r *Cell) getMaxHeight() int {
 }
 
 func (r *Cell) getExtraWidth() int {
-	return r.style.GetHorizontalMargins() + r.style.GetHorizontalBorderSize()
+	return r.style.GetHorizontalFrameSize()
 }
 
 func (r *Cell) getExtraHeight() int {
-	return r.style.GetVerticalMargins() + r.style.GetVerticalBorderSize()
+	return r.style.GetVerticalFrameSize()
 }
 
 func (r *Cell) copy() Cell {

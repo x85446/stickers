@@ -231,11 +231,11 @@ func (r *Column) getMaxHeight() int {
 }
 
 func (r *Column) getExtraWidth() int {
-	return r.style.GetHorizontalMargins() + r.style.GetHorizontalBorderSize()
+	return r.style.GetHorizontalFrameSize()
 }
 
 func (r *Column) getExtraHeight() int {
-	return r.style.GetVerticalMargins() + r.style.GetVerticalBorderSize()
+	return r.style.GetVerticalFrameSize()
 }
 
 func (r *Column) copy() Column {

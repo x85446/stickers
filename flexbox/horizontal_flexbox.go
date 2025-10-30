@@ -253,9 +253,9 @@ func (r *HorizontalFlexBox) getMaxHeight() int {
 }
 
 func (r *HorizontalFlexBox) getExtraWidth() int {
-	return r.style.GetHorizontalMargins() + r.style.GetHorizontalBorderSize()
+	return r.style.GetHorizontalFrameSize()
 }
 
 func (r *HorizontalFlexBox) getExtraHeight() int {
-	return r.style.GetVerticalMargins() + r.style.GetVerticalBorderSize()
+	return r.style.GetVerticalFrameSize()
 }
