@@ -84,7 +84,7 @@ func (m *model) rebuildFlexBox() {
 	// Row 1: Header-like row (fixed height when enabled)
 	row1 := m.flexBox.NewRow()
 	if m.useFixed {
-		row1.SetFixedHeight(4) // Set to 4 to account for borders
+		row1.SetFixedHeight(5) // Set to 5 to fully account for borders
 	}
 
 	// Three cells: Fixed sidebar | Dynamic content | Fixed info
@@ -251,7 +251,7 @@ func (m *model) rebuildFlexBox() {
 	// Row 4: Footer-like row (fixed height when enabled)
 	row4 := m.flexBox.NewRow()
 	if m.useFixed {
-		row4.SetFixedHeight(4) // Set to 4 to account for borders
+		row4.SetFixedHeight(5) // Set to 5 to fully account for borders
 	}
 
 	// Five cells with varying ratios
