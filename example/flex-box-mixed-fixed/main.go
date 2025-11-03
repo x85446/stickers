@@ -84,7 +84,7 @@ func (m *model) rebuildFlexBox() {
 	// Row 1: Header-like row (fixed height when enabled)
 	row1 := m.flexBox.NewRow()
 	if m.useFixed {
-		row1.SetFixedHeight(5)
+		row1.SetFixedHeight(3) // Set to 3 to match the 3 lines of text
 	}
 
 	// Three cells: Fixed sidebar | Dynamic content | Fixed info
@@ -251,7 +251,7 @@ func (m *model) rebuildFlexBox() {
 	// Row 4: Footer-like row (fixed height when enabled)
 	row4 := m.flexBox.NewRow()
 	if m.useFixed {
-		row4.SetFixedHeight(4)
+		row4.SetFixedHeight(3) // Set to 3 to match the 3 lines of text
 	}
 
 	// Five cells with varying ratios
