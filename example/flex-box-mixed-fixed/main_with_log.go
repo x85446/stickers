@@ -1,0 +1,416 @@
+package main
+
+import (
+	"fmt"
+	"log"
+	"os"
+	"time"
+
+	"github.com/76creates/stickers/flexbox"
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+)
+
+var (
+	colors = []string{
+		"#fc5c65", "#fd9644", "#fed330", "#26de81", "#2bcbba",
+		"#eb3b5a", "#fa8231", "#f7b731", "#20bf6b", "#0fb9b1",
+		"#45aaf2", "#4b7bec", "#a55eea", "#d1d8e0", "#778ca3",
+		"#2d98da", "#3867d6", "#8854d0", "#a5b1c2", "#4b6584",
+	}
+
+	// Logger for size changes
+	sizeLogger *log.Logger
+	logFile    *os.File
+)
+
+type model struct {
+	flexBox    *flexbox.FlexBox
+	borderType int  // 0=none, 1=normal, 2=rounded, 3=thick, 4=double
+	useFixed   bool // Toggle fixed vs dynamic
+	hideText   bool // Toggle text visibility
+	renderCount int  // Track render cycles
+}
+
+var borderTypes = []lipgloss.Border{
+	{}, // no border
+	lipgloss.NormalBorder(),
+	lipgloss.RoundedBorder(),
+	lipgloss.ThickBorder(),
+	lipgloss.DoubleBorder(),
+}
+
+var borderNames = []string{
+	"Filled Background",
+	"Normal Border",
+	"Rounded Border",
+	"Thick Border",
+	"Double Border",
+}
+
+func initLogger() {
+	var err error
+	logFile, err = os.Create("demo10_size_log.txt")
+	if err != nil {
+		log.Fatal("Failed to create log file:", err)
+	}
+	sizeLogger = log.New(logFile, "", log.Ltime|log.Lmicroseconds)
+	sizeLogger.Println("=== Demo-10 Size Change Log Started ===")
+}
+
+func logSize(cellName string, row int, w, h int, fixed bool, fixedW, fixedH bool) {
+	mode := "dynamic"
+	if fixed {
+		mode = "fixed"
+	}
+	wMode := "dyn"
+	if fixedW {
+		wMode = "fix"
+	}
+	hMode := "dyn"
+	if fixedH {
+		hMode = "fix"
+	}
+	sizeLogger.Printf("Row%d [%s] %dx%d (mode:%s, W:%s, H:%s)",
+		row, cellName, w, h, mode, wMode, hMode)
+}
+
+func main() {
+	initLogger()
+	defer logFile.Close()
+
+	m := model{
+		flexBox:    flexbox.New(0, 0),
+		borderType: 1,    // Start with normal border
+		useFixed:   true, // Start with fixed sizes enabled
+	}
+
+	sizeLogger.Println("=== Starting Demo ===")
+	p := tea.NewProgram(&m, tea.WithAltScreen())
+	if err := p.Start(); err != nil {
+		fmt.Printf("Alas, there's been an error: %v", err)
+		os.Exit(1)
+	}
+	sizeLogger.Println("=== Demo Ended ===")
+}
+
+func (m *model) Init() tea.Cmd { return nil }
+
+func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		sizeLogger.Printf("=== WINDOW RESIZE: %dx%d ===", msg.Width, msg.Height)
+		m.flexBox.SetWidth(msg.Width)
+		m.flexBox.SetHeight(msg.Height)
+		m.rebuildFlexBox()
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c", "q":
+			return m, tea.Quit
+		case "t":
+			m.borderType = (m.borderType + 1) % len(borderTypes)
+			sizeLogger.Printf("=== BORDER CHANGED: %s ===", borderNames[m.borderType])
+			m.rebuildFlexBox()
+		case "f":
+			m.useFixed = !m.useFixed
+			sizeLogger.Printf("=== MODE CHANGED: fixed=%v ===", m.useFixed)
+			m.rebuildFlexBox()
+		case "h":
+			m.hideText = !m.hideText
+			sizeLogger.Printf("=== TEXT VISIBILITY: hidden=%v ===", m.hideText)
+			m.rebuildFlexBox()
+		}
+	}
+	return m, nil
+}
+
+func (m *model) rebuildFlexBox() {
+	m.renderCount++
+	sizeLogger.Printf("=== REBUILD #%d (fixed=%v, border=%s) ===",
+		m.renderCount, m.useFixed, borderNames[m.borderType])
+
+	// Clear and rebuild
+	m.flexBox.SetRows([]*flexbox.Row{})
+
+	// Row 1: Header-like row (fixed height when enabled)
+	row1 := m.flexBox.NewRow()
+	if m.useFixed {
+		row1.SetFixedHeight(5) // Set to 5 to fully account for borders
+		sizeLogger.Println("Row1: SetFixedHeight(5)")
+	}
+
+	// Three cells: Fixed sidebar | Dynamic content | Fixed info
+	cell1 := flexbox.NewCell(1, 1).SetStyle(m.getCellStyle(0))
+	if m.useFixed {
+		cell1.SetFixedWidth(25) // Fixed sidebar width
+		sizeLogger.Println("Row1/Sidebar: SetFixedWidth(25)")
+	}
+	cell1.SetContentGenerator(func(w, h int) string {
+		logSize("Sidebar", 1, w, h, m.useFixed, m.useFixed, m.useFixed)
+		if m.hideText {
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
+		}
+		hStatus := "H dynamic"
+		wStatus := "W dynamic"
+		if m.useFixed {
+			hStatus = "H fixed"
+			wStatus = "W fixed"
+		}
+		return lipgloss.NewStyle().
+			Width(w).Height(h).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(fmt.Sprintf("Sidebar\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+	})
+
+	cell2 := flexbox.NewCell(3, 1).SetStyle(m.getCellStyle(1))
+	cell2.SetContentGenerator(func(w, h int) string {
+		logSize("Header", 1, w, h, m.useFixed, false, m.useFixed)
+		if m.hideText {
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
+		}
+		hStatus := "H dynamic"
+		wStatus := "W dynamic" // Always dynamic width
+		if m.useFixed {
+			hStatus = "H fixed"
+		}
+		return lipgloss.NewStyle().
+			Width(w).Height(h).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(fmt.Sprintf("Header Area\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+	})
+
+	cell3 := flexbox.NewCell(1, 1).SetStyle(m.getCellStyle(2))
+	if m.useFixed {
+		cell3.SetFixedWidth(20) // Fixed info panel width
+		sizeLogger.Println("Row1/Info: SetFixedWidth(20)")
+	}
+	cell3.SetContentGenerator(func(w, h int) string {
+		logSize("Info", 1, w, h, m.useFixed, m.useFixed, m.useFixed)
+		if m.hideText {
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
+		}
+		hStatus := "H dynamic"
+		wStatus := "W dynamic"
+		if m.useFixed {
+			hStatus = "H fixed"
+			wStatus = "W fixed"
+		}
+		return lipgloss.NewStyle().
+			Width(w).Height(h).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(fmt.Sprintf("Info\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+	})
+
+	row1.AddCells(cell1, cell2, cell3)
+
+	// Row 2: Main content row (dynamic height)
+	row2 := m.flexBox.NewRow()
+
+	// Seven cells with mixed fixed/dynamic widths
+	cells := []struct {
+		ratio      int
+		fixedWidth int
+		label      string
+	}{
+		{2, 15, "Nav"},      // Fixed narrow nav
+		{2, 0, "Col1"},      // Dynamic
+		{3, 0, "Main"},      // Dynamic main area
+		{3, 0, "Col2"},      // Dynamic
+		{3, 0, "Col3"},      // Dynamic
+		{4, 0, "Content"},   // Dynamic
+		{4, 30, "Details"},  // Fixed details panel
+	}
+
+	for i, c := range cells {
+		cell := flexbox.NewCell(c.ratio, 4).SetStyle(m.getCellStyle(i + 3))
+		if m.useFixed && c.fixedWidth > 0 {
+			cell.SetFixedWidth(c.fixedWidth)
+			sizeLogger.Printf("Row2/%s: SetFixedWidth(%d)", c.label, c.fixedWidth)
+		}
+		idx := i
+		label := c.label
+		cell.SetContentGenerator(func(w, h int) string {
+			hasFixedW := m.useFixed && cells[idx].fixedWidth > 0
+			logSize(label, 2, w, h, m.useFixed, hasFixedW, false)
+			if m.hideText {
+				return lipgloss.NewStyle().Width(w).Height(h).Render("")
+			}
+			hStatus := "H dynamic" // Row 2 is always dynamic height
+			wStatus := "W dynamic"
+			if hasFixedW {
+				wStatus = "W fixed"
+			}
+			return lipgloss.NewStyle().
+				Width(w).Height(h).
+				Align(lipgloss.Center, lipgloss.Center).
+				Render(fmt.Sprintf("%s\n%s, %s\n(%dx%d)", label, hStatus, wStatus, w, h))
+		})
+		row2.AddCells(cell)
+	}
+
+	// Row 3: Mixed row with central focus
+	row3 := m.flexBox.NewRow()
+
+	cell31 := flexbox.NewCell(2, 5).SetStyle(m.getCellStyle(10))
+	if m.useFixed {
+		cell31.SetFixedWidth(20)
+		sizeLogger.Println("Row3/Left: SetFixedWidth(20)")
+	}
+	cell31.SetContentGenerator(func(w, h int) string {
+		logSize("Left", 3, w, h, m.useFixed, m.useFixed, false)
+		if m.hideText {
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
+		}
+		hStatus := "H dynamic" // Row 3 is always dynamic height
+		wStatus := "W dynamic"
+		if m.useFixed {
+			wStatus = "W fixed"
+		}
+		return lipgloss.NewStyle().
+			Width(w).Height(h).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(fmt.Sprintf("Left\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+	})
+
+	cell32 := flexbox.NewCell(3, 5).SetStyle(m.getCellStyle(11))
+	cell32.SetContentGenerator(func(w, h int) string {
+		logSize("Center", 3, w, h, m.useFixed, false, false)
+		if m.hideText {
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
+		}
+		hStatus := "H dynamic" // Row 3 is always dynamic height
+		wStatus := "W dynamic" // Always dynamic width
+		return lipgloss.NewStyle().
+			Width(w).Height(h).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(fmt.Sprintf("Center\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+	})
+
+	cell33 := flexbox.NewCell(10, 5).SetStyle(m.getCellStyle(12))
+	cell33.SetContentGenerator(func(w, h int) string {
+		logSize("MainCenter", 3, w, h, m.useFixed, false, false)
+		if m.hideText {
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
+		}
+		hStatus := "H dynamic" // Row 3 is always dynamic height
+		wStatus := "W dynamic" // Always dynamic width
+		modeText := "All Dynamic"
+		if m.useFixed {
+			modeText = "Mixed Fixed/Dynamic"
+		}
+		return lipgloss.NewStyle().
+			Width(w).Height(h).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(fmt.Sprintf("%s\n%s\n%s, %s\n(%dx%d)\n\n't' = border\n'f' = fixed\n'h' = hide text",
+				borderNames[m.borderType], modeText, hStatus, wStatus, w, h))
+	})
+
+	cell34 := flexbox.NewCell(3, 5).SetStyle(m.getCellStyle(13))
+	cell34.SetContentGenerator(func(w, h int) string {
+		logSize("Dynamic", 3, w, h, m.useFixed, false, false)
+		if m.hideText {
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
+		}
+		hStatus := "H dynamic" // Row 3 is always dynamic height
+		wStatus := "W dynamic" // Always dynamic width
+		return lipgloss.NewStyle().
+			Width(w).Height(h).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(fmt.Sprintf("Dynamic\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+	})
+
+	cell35 := flexbox.NewCell(2, 5).SetStyle(m.getCellStyle(14))
+	if m.useFixed {
+		cell35.SetFixedWidth(20)
+		sizeLogger.Println("Row3/Right: SetFixedWidth(20)")
+	}
+	cell35.SetContentGenerator(func(w, h int) string {
+		logSize("Right", 3, w, h, m.useFixed, m.useFixed, false)
+		if m.hideText {
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
+		}
+		hStatus := "H dynamic" // Row 3 is always dynamic height
+		wStatus := "W dynamic"
+		if m.useFixed {
+			wStatus = "W fixed"
+		}
+		return lipgloss.NewStyle().
+			Width(w).Height(h).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(fmt.Sprintf("Right\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+	})
+
+	row3.AddCells(cell31, cell32, cell33, cell34, cell35)
+
+	// Row 4: Footer-like row (fixed height when enabled)
+	row4 := m.flexBox.NewRow()
+	if m.useFixed {
+		row4.SetFixedHeight(6) // Set to 6 - narrow cells F1/F5 need extra height for text wrapping
+		sizeLogger.Println("Row4: SetFixedHeight(6)")
+	}
+
+	// Five cells with varying ratios
+	for i := 0; i < 5; i++ {
+		ratios := []int{1, 1, 1, 1, 1}
+		fixedWidths := []int{12, 0, 0, 0, 12}  // First and last fixed
+
+		cell := flexbox.NewCell(ratios[i], 4).SetStyle(m.getCellStyle(15 + i))
+		if m.useFixed && fixedWidths[i] > 0 {
+			cell.SetFixedWidth(fixedWidths[i])
+			sizeLogger.Printf("Row4/F%d: SetFixedWidth(%d)", i+1, fixedWidths[i])
+		}
+
+		idx := i
+		cell.SetContentGenerator(func(w, h int) string {
+			label := fmt.Sprintf("F%d", idx+1)
+			hasFixedW := m.useFixed && fixedWidths[idx] > 0
+			logSize(label, 4, w, h, m.useFixed, hasFixedW, m.useFixed)
+			if m.hideText {
+				return lipgloss.NewStyle().Width(w).Height(h).Render("")
+			}
+			hStatus := "H dynamic"
+			wStatus := "W dynamic"
+			if m.useFixed {
+				hStatus = "H fixed" // Row 4 has fixed height when useFixed
+				if hasFixedW {
+					wStatus = "W fixed"
+					label = fmt.Sprintf("Fix%d", idx+1)
+				}
+			}
+			return lipgloss.NewStyle().
+				Width(w).Height(h).
+				Align(lipgloss.Center, lipgloss.Center).
+				Render(fmt.Sprintf("%s\n%s, %s\n(%dx%d)", label, hStatus, wStatus, w, h))
+		})
+		row4.AddCells(cell)
+	}
+
+	m.flexBox.AddRows([]*flexbox.Row{row1, row2, row3, row4})
+	sizeLogger.Println("=== REBUILD COMPLETE ===")
+}
+
+func (m *model) getCellStyle(colorIndex int) lipgloss.Style {
+	if m.borderType == 0 {
+		// Filled background
+		return lipgloss.NewStyle().Background(lipgloss.Color(colors[colorIndex]))
+	}
+	// Border with type
+	return lipgloss.NewStyle().
+		Border(borderTypes[m.borderType]).
+		BorderForeground(lipgloss.Color(colors[colorIndex]))
+}
+
+func (m *model) View() string {
+	header := lipgloss.NewStyle().Bold(true).
+		Render(fmt.Sprintf("Mixed Fixed/Dynamic Layout (LOGGING) | 't' = border | 'f' = fixed | 'h' = hide text | %s, Mode: %s, Text: %s",
+			borderNames[m.borderType],
+			map[bool]string{true: "Fixed", false: "Dynamic"}[m.useFixed],
+			map[bool]string{true: "Hidden", false: "Visible"}[m.hideText]))
+
+	m.renderCount++
+	sizeLogger.Printf("=== VIEW RENDER #%d ===", m.renderCount)
+	rendered := m.flexBox.Render()
+	sizeLogger.Printf("=== RENDER COMPLETE #%d ===", m.renderCount)
+
+	return header + "\n" + rendered
+}

@@ -1,4 +1,4 @@
-.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 demo-10 help
+.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 demo-10 demo-10-log log log-follow help
 
 help:
 	@echo "Available demos:"
@@ -12,6 +12,11 @@ help:
 	@echo "  make demo-8  - FlexBox Fixed Rows"
 	@echo "  make demo-9  - FlexBox Fixed Width Columns"
 	@echo "  make demo-10 - FlexBox Mixed Fixed Layout"
+	@echo ""
+	@echo "Logging commands:"
+	@echo "  make demo-10-log - Run demo-10 with size logging"
+	@echo "  make log         - View the last 50 lines of the log"
+	@echo "  make log-follow  - Follow the log in real-time"
 
 demo-1:
 	@go run ./example/flex-box-simple/main.go
@@ -42,3 +47,20 @@ demo-9:
 
 demo-10:
 	@go run ./example/flex-box-mixed-fixed/main.go
+
+demo-10-log:
+	@echo "Starting demo-10 with logging to demo10_size_log.txt..."
+	@go run ./example/flex-box-mixed-fixed/main_with_log.go
+
+log:
+	@if [ -f demo10_size_log.txt ]; then \
+		echo "=== Viewing last 50 lines of demo10_size_log.txt ==="; \
+		tail -50 demo10_size_log.txt; \
+	else \
+		echo "No log file found. Run 'make demo-10-log' first."; \
+	fi
+
+log-follow:
+	@echo "Following demo10_size_log.txt (Ctrl+C to stop)..."
+	@touch demo10_size_log.txt
+	@tail -f demo10_size_log.txt
