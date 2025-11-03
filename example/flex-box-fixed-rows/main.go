@@ -65,7 +65,7 @@ func (m *model) rebuildFlexBox() {
 			Width(w).
 			Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("HEADER (Height: %d)", h))
+			Render(fmt.Sprintf("HEADER\n%dx%d", w, h))
 	})
 	headerRow.AddCells(headerCell)
 
@@ -124,7 +124,7 @@ func (m *model) rebuildFlexBox() {
 			Width(w).
 			Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("FOOTER (Height: %d)", h))
+			Render(fmt.Sprintf("FOOTER\n%dx%d", w, h))
 	})
 	footerRow.AddCells(footerCell)
 
