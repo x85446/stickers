@@ -93,22 +93,29 @@ func (m *model) rebuildFlexBox() {
 		cell1.SetFixedWidth(25) // Fixed sidebar width
 	}
 	cell1.SetContentGenerator(func(w, h int) string {
-		return lipgloss.NewStyle().
-			Width(w).Height(h).
-			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Sidebar\n%dx%d", w, h))
-	})
-
-	cell2 := flexbox.NewCell(3, 1).SetStyle(m.getCellStyle(1))
-	cell2.SetContentGenerator(func(w, h int) string {
-		fixedText := "Dynamic"
+		hStatus := "H dynamic"
+		wStatus := "W dynamic"
 		if m.useFixed {
-			fixedText = "Fixed Mode"
+			hStatus = "H fixed"
+			wStatus = "W fixed"
 		}
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Header Area (%s)\n%dx%d", fixedText, w, h))
+			Render(fmt.Sprintf("Sidebar\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+	})
+
+	cell2 := flexbox.NewCell(3, 1).SetStyle(m.getCellStyle(1))
+	cell2.SetContentGenerator(func(w, h int) string {
+		hStatus := "H dynamic"
+		wStatus := "W dynamic" // Always dynamic width
+		if m.useFixed {
+			hStatus = "H fixed"
+		}
+		return lipgloss.NewStyle().
+			Width(w).Height(h).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(fmt.Sprintf("Header Area\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
 	})
 
 	cell3 := flexbox.NewCell(1, 1).SetStyle(m.getCellStyle(2))
@@ -116,10 +123,16 @@ func (m *model) rebuildFlexBox() {
 		cell3.SetFixedWidth(20) // Fixed info panel width
 	}
 	cell3.SetContentGenerator(func(w, h int) string {
+		hStatus := "H dynamic"
+		wStatus := "W dynamic"
+		if m.useFixed {
+			hStatus = "H fixed"
+			wStatus = "W fixed"
+		}
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Info\n%dx%d", w, h))
+			Render(fmt.Sprintf("Info\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
 	})
 
 	row1.AddCells(cell1, cell2, cell3)
@@ -150,14 +163,15 @@ func (m *model) rebuildFlexBox() {
 		idx := i
 		label := c.label
 		cell.SetContentGenerator(func(w, h int) string {
-			sizeInfo := fmt.Sprintf("%dx%d", w, h)
+			hStatus := "H dynamic" // Row 2 is always dynamic height
+			wStatus := "W dynamic"
 			if m.useFixed && cells[idx].fixedWidth > 0 {
-				sizeInfo = fmt.Sprintf("Fixed: %dx%d", w, h)
+				wStatus = "W fixed"
 			}
 			return lipgloss.NewStyle().
 				Width(w).Height(h).
 				Align(lipgloss.Center, lipgloss.Center).
-				Render(fmt.Sprintf("%s\n%s", label, sizeInfo))
+				Render(fmt.Sprintf("%s\n%s, %s\n(%dx%d)", label, hStatus, wStatus, w, h))
 		})
 		row2.AddCells(cell)
 	}
@@ -170,22 +184,31 @@ func (m *model) rebuildFlexBox() {
 		cell31.SetFixedWidth(20)
 	}
 	cell31.SetContentGenerator(func(w, h int) string {
+		hStatus := "H dynamic" // Row 3 is always dynamic height
+		wStatus := "W dynamic"
+		if m.useFixed {
+			wStatus = "W fixed"
+		}
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Left\n%dx%d", w, h))
+			Render(fmt.Sprintf("Left\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
 	})
 
 	cell32 := flexbox.NewCell(3, 5).SetStyle(m.getCellStyle(11))
 	cell32.SetContentGenerator(func(w, h int) string {
+		hStatus := "H dynamic" // Row 3 is always dynamic height
+		wStatus := "W dynamic" // Always dynamic width
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Dynamic Center\n%dx%d", w, h))
+			Render(fmt.Sprintf("Center\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
 	})
 
 	cell33 := flexbox.NewCell(10, 5).SetStyle(m.getCellStyle(12))
 	cell33.SetContentGenerator(func(w, h int) string {
+		hStatus := "H dynamic" // Row 3 is always dynamic height
+		wStatus := "W dynamic" // Always dynamic width
 		modeText := "All Dynamic"
 		if m.useFixed {
 			modeText = "Mixed Fixed/Dynamic"
@@ -193,16 +216,18 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("%s\n%s\n%dx%d\n\n't' = toggle border\n'f' = toggle fixed",
-				borderNames[m.borderType], modeText, w, h))
+			Render(fmt.Sprintf("%s\n%s\n%s, %s\n(%dx%d)\n\n't' = border\n'f' = fixed",
+				borderNames[m.borderType], modeText, hStatus, wStatus, w, h))
 	})
 
 	cell34 := flexbox.NewCell(3, 5).SetStyle(m.getCellStyle(13))
 	cell34.SetContentGenerator(func(w, h int) string {
+		hStatus := "H dynamic" // Row 3 is always dynamic height
+		wStatus := "W dynamic" // Always dynamic width
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Dynamic\n%dx%d", w, h))
+			Render(fmt.Sprintf("Dynamic\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
 	})
 
 	cell35 := flexbox.NewCell(2, 5).SetStyle(m.getCellStyle(14))
@@ -210,10 +235,15 @@ func (m *model) rebuildFlexBox() {
 		cell35.SetFixedWidth(20)
 	}
 	cell35.SetContentGenerator(func(w, h int) string {
+		hStatus := "H dynamic" // Row 3 is always dynamic height
+		wStatus := "W dynamic"
+		if m.useFixed {
+			wStatus = "W fixed"
+		}
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Right\n%dx%d", w, h))
+			Render(fmt.Sprintf("Right\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
 	})
 
 	row3.AddCells(cell31, cell32, cell33, cell34, cell35)
@@ -237,13 +267,19 @@ func (m *model) rebuildFlexBox() {
 		idx := i
 		cell.SetContentGenerator(func(w, h int) string {
 			label := fmt.Sprintf("F%d", idx+1)
-			if m.useFixed && fixedWidths[idx] > 0 {
-				label = fmt.Sprintf("Fix%d", idx+1)
+			hStatus := "H dynamic"
+			wStatus := "W dynamic"
+			if m.useFixed {
+				hStatus = "H fixed" // Row 4 has fixed height when useFixed
+				if fixedWidths[idx] > 0 {
+					wStatus = "W fixed"
+					label = fmt.Sprintf("Fix%d", idx+1)
+				}
 			}
 			return lipgloss.NewStyle().
 				Width(w).Height(h).
 				Align(lipgloss.Center, lipgloss.Center).
-				Render(fmt.Sprintf("%s\n%dx%d", label, w, h))
+				Render(fmt.Sprintf("%s\n%s, %s\n(%dx%d)", label, hStatus, wStatus, w, h))
 		})
 		row4.AddCells(cell)
 	}
