@@ -25,6 +25,8 @@ type Cell struct {
 
 	// fixedWidth if > 0, this cell will have a fixed width instead of ratio-based
 	fixedWidth int
+	// fixedHeight if > 0, this cell requests a fixed height (row will use max of all cells)
+	fixedHeight int
 
 	width  int
 	height int
@@ -97,6 +99,13 @@ func (r *Cell) SetMinHeigth(value int) *Cell {
 // This has only an effect to cells of a HorizontalFlexBox.
 func (r *Cell) SetMinHeight(value int) *Cell {
 	r.minHeight = value
+	return r
+}
+
+// SetFixedHeight sets a fixed height request for the cell
+// Note: All cells in a row will have the same height (the maximum requested)
+func (r *Cell) SetFixedHeight(value int) *Cell {
+	r.fixedHeight = value
 	return r
 }
 

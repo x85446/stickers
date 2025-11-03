@@ -223,9 +223,17 @@ func (r *FlexBox) calculateRowHeight() (distribution []int) {
 
 	// First pass: identify fixed and dynamic rows
 	for i, row := range r.rows {
-		if row.fixedHeight > 0 {
-			distribution[i] = row.fixedHeight
-			totalFixedHeight += row.fixedHeight
+		// Check for the maximum fixed height among row and its cells
+		maxFixedHeight := row.fixedHeight
+		for _, cell := range row.cells {
+			if cell.fixedHeight > maxFixedHeight {
+				maxFixedHeight = cell.fixedHeight
+			}
+		}
+
+		if maxFixedHeight > 0 {
+			distribution[i] = maxFixedHeight
+			totalFixedHeight += maxFixedHeight
 		} else {
 			dynamicRowIndices = append(dynamicRowIndices, i)
 			// Get cell ratios for this dynamic row

@@ -1,4 +1,4 @@
-.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 demo-10 demo-10-log log log-follow help
+.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 demo-10 demo-10-log demo-11 log log-follow help
 
 help:
 	@echo "Available demos:"
@@ -12,6 +12,7 @@ help:
 	@echo "  make demo-8  - FlexBox Fixed Rows"
 	@echo "  make demo-9  - FlexBox Fixed Width Columns"
 	@echo "  make demo-10 - FlexBox Mixed Fixed Layout"
+	@echo "  make demo-11 - FlexBox Interactive Cell Config"
 	@echo ""
 	@echo "Logging commands:"
 	@echo "  make demo-10-log - Run demo-10 with size logging"
@@ -51,6 +52,9 @@ demo-10:
 demo-10-log:
 	@echo "Starting demo-10 with logging to demo10_size_log.txt..."
 	@go run ./example/flex-box-mixed-fixed/main_with_log.go
+
+demo-11:
+	@go run ./example/flex-box-cell-config/main.go
 
 log:
 	@if [ -f demo10_size_log.txt ]; then \
