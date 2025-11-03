@@ -19,6 +19,9 @@ type Row struct {
 	height int
 	width  int
 
+	// fixedHeight if > 0, this row will have a fixed height instead of ratio-based
+	fixedHeight int
+
 	// recalculateFlag indicates if next render should make calculations regarding
 	// the cells objects height/width
 	recalculateFlag bool
@@ -33,6 +36,14 @@ func (r *Row) AddCells(cells ...*Cell) *Row {
 			cell.id = strconv.Itoa(i)
 		}
 	}
+	r.setRecalculate()
+	return r
+}
+
+// SetFixedHeight sets a fixed height for this row, disabling proportional sizing
+// for this specific row. Setting to -1 or 0 will revert to dynamic sizing.
+func (r *Row) SetFixedHeight(value int) *Row {
+	r.fixedHeight = value
 	r.setRecalculate()
 	return r
 }

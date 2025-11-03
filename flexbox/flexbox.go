@@ -205,6 +205,7 @@ func (r *FlexBox) unsetRecalculate() {
 
 // calculateRowHeight calculates the height of each row and returns the distribution array
 func (r *FlexBox) calculateRowHeight() (distribution []int) {
+	// Legacy behavior: if global fixedRowHeight is set, use it for all rows
 	if r.fixedRowHeight > 0 {
 		var fixedRows []int
 		for range r.rows {
@@ -212,7 +213,44 @@ func (r *FlexBox) calculateRowHeight() (distribution []int) {
 		}
 		return fixedRows
 	}
-	return calculateMatrixRatio(r.getContentHeight(), r.getRowMatrix())
+
+	// New behavior: handle per-row fixed heights
+	var dynamicRowIndices []int
+	var dynamicRowMatrix [][]int
+	totalFixedHeight := 0
+
+	distribution = make([]int, len(r.rows))
+
+	// First pass: identify fixed and dynamic rows
+	for i, row := range r.rows {
+		if row.fixedHeight > 0 {
+			distribution[i] = row.fixedHeight
+			totalFixedHeight += row.fixedHeight
+		} else {
+			dynamicRowIndices = append(dynamicRowIndices, i)
+			// Get cell ratios for this dynamic row
+			var cellValues []int
+			for _, cell := range row.cells {
+				cellValues = append(cellValues, cell.ratioY)
+			}
+			dynamicRowMatrix = append(dynamicRowMatrix, cellValues)
+		}
+	}
+
+	// Second pass: distribute remaining space among dynamic rows
+	if len(dynamicRowIndices) > 0 {
+		remainingHeight := r.getContentHeight() - totalFixedHeight
+		if remainingHeight < 0 {
+			remainingHeight = 0
+		}
+		dynamicDistribution := calculateMatrixRatio(remainingHeight, dynamicRowMatrix)
+
+		for i, rowIndex := range dynamicRowIndices {
+			distribution[rowIndex] = dynamicDistribution[i]
+		}
+	}
+
+	return distribution
 }
 
 // distributeRowsDimensions sets height and width of each row per distribution array
