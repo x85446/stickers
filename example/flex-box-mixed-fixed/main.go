@@ -251,7 +251,7 @@ func (m *model) rebuildFlexBox() {
 	// Row 4: Footer-like row (fixed height when enabled)
 	row4 := m.flexBox.NewRow()
 	if m.useFixed {
-		row4.SetFixedHeight(5) // Set to 5 to fully account for borders
+		row4.SetFixedHeight(6) // Set to 6 - narrow cells F1/F5 need extra height for text wrapping
 	}
 
 	// Five cells with varying ratios
