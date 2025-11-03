@@ -98,7 +98,7 @@ func (m *model) rebuildFlexBox() {
 	}
 	cell1.SetContentGenerator(func(w, h int) string {
 		if m.hideText {
-			return ""
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
 		}
 		hStatus := "H dynamic"
 		wStatus := "W dynamic"
@@ -115,7 +115,7 @@ func (m *model) rebuildFlexBox() {
 	cell2 := flexbox.NewCell(3, 1).SetStyle(m.getCellStyle(1))
 	cell2.SetContentGenerator(func(w, h int) string {
 		if m.hideText {
-			return ""
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
 		}
 		hStatus := "H dynamic"
 		wStatus := "W dynamic" // Always dynamic width
@@ -134,7 +134,7 @@ func (m *model) rebuildFlexBox() {
 	}
 	cell3.SetContentGenerator(func(w, h int) string {
 		if m.hideText {
-			return ""
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
 		}
 		hStatus := "H dynamic"
 		wStatus := "W dynamic"
@@ -201,7 +201,7 @@ func (m *model) rebuildFlexBox() {
 	}
 	cell31.SetContentGenerator(func(w, h int) string {
 		if m.hideText {
-			return ""
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
 		}
 		hStatus := "H dynamic" // Row 3 is always dynamic height
 		wStatus := "W dynamic"
@@ -217,7 +217,7 @@ func (m *model) rebuildFlexBox() {
 	cell32 := flexbox.NewCell(3, 5).SetStyle(m.getCellStyle(11))
 	cell32.SetContentGenerator(func(w, h int) string {
 		if m.hideText {
-			return ""
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
 		}
 		hStatus := "H dynamic" // Row 3 is always dynamic height
 		wStatus := "W dynamic" // Always dynamic width
@@ -230,7 +230,7 @@ func (m *model) rebuildFlexBox() {
 	cell33 := flexbox.NewCell(10, 5).SetStyle(m.getCellStyle(12))
 	cell33.SetContentGenerator(func(w, h int) string {
 		if m.hideText {
-			return ""
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
 		}
 		hStatus := "H dynamic" // Row 3 is always dynamic height
 		wStatus := "W dynamic" // Always dynamic width
@@ -248,7 +248,7 @@ func (m *model) rebuildFlexBox() {
 	cell34 := flexbox.NewCell(3, 5).SetStyle(m.getCellStyle(13))
 	cell34.SetContentGenerator(func(w, h int) string {
 		if m.hideText {
-			return ""
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
 		}
 		hStatus := "H dynamic" // Row 3 is always dynamic height
 		wStatus := "W dynamic" // Always dynamic width
@@ -264,7 +264,7 @@ func (m *model) rebuildFlexBox() {
 	}
 	cell35.SetContentGenerator(func(w, h int) string {
 		if m.hideText {
-			return ""
+			return lipgloss.NewStyle().Width(w).Height(h).Render("")
 		}
 		hStatus := "H dynamic" // Row 3 is always dynamic height
 		wStatus := "W dynamic"
