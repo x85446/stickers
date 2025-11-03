@@ -1,4 +1,4 @@
-.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 help
+.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 help
 
 help:
 	@echo "Available demos:"
@@ -10,6 +10,7 @@ help:
 	@echo "  make demo-6  - FlexBox Nested Borders"
 	@echo "  make demo-7  - FlexBox Simple Borders"
 	@echo "  make demo-8  - FlexBox Fixed Rows"
+	@echo "  make demo-9  - FlexBox Fixed Width Columns"
 
 demo-1:
 	@go run ./example/flex-box-simple/main.go
@@ -34,3 +35,6 @@ demo-7:
 
 demo-8:
 	@go run ./example/flex-box-fixed-rows/main.go
+
+demo-9:
+	@go run ./example/flex-box-fixed-width/main.go

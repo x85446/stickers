@@ -184,24 +184,59 @@ func (r *Row) calculateCellsDimensions() (xMatrix, yMatrix []int) {
 	// reminder not needed here due to how combined ratio is passed
 	yMatrix, _ = distributeToMatrix(r.getContentHeight(), cellYMatrixMax, cellYMatrix)
 
-	// get the min width matrix of the cells if any
-	withMinWidth := false
-	var minWidthMatrix []int
-	for _, c := range r.cells {
-		minWidthMatrix = append(minWidthMatrix, c.minWidth)
-		if c.minWidth > 0 {
-			withMinWidth = true
+	// calculate the cell width matrix with support for fixed widths
+	xMatrix = r.calculateCellWidth()
+
+	return xMatrix, yMatrix
+}
+
+// calculateCellWidth calculates width distribution for cells, respecting fixed widths
+func (r *Row) calculateCellWidth() []int {
+	totalWidth := r.getContentWidth()
+	widthMatrix := make([]int, len(r.cells))
+
+	// First pass: allocate fixed widths and calculate remaining space
+	remainingWidth := totalWidth
+	var dynamicCells []int  // indices of cells with dynamic widths
+	var dynamicRatios []int // ratios for dynamic cells
+	var minWidths []int     // min widths for dynamic cells
+	hasMinWidth := false
+
+	for i, cell := range r.cells {
+		if cell.fixedWidth > 0 {
+			widthMatrix[i] = cell.fixedWidth
+			remainingWidth -= cell.fixedWidth
+		} else {
+			dynamicCells = append(dynamicCells, i)
+			dynamicRatios = append(dynamicRatios, cell.ratioX)
+			minWidths = append(minWidths, cell.minWidth)
+			if cell.minWidth > 0 {
+				hasMinWidth = true
+			}
 		}
 	}
 
-	// calculate the cell width matrix
-	if withMinWidth {
-		xMatrix = calculateRatioWithMinimum(r.getContentWidth(), r.getCellWidthMatrix(), minWidthMatrix)
-	} else {
-		xMatrix = calculateRatio(r.getContentWidth(), r.getCellWidthMatrix())
+	// Second pass: distribute remaining width among dynamic cells
+	if len(dynamicCells) > 0 && remainingWidth > 0 {
+		var dynamicWidths []int
+		if hasMinWidth {
+			dynamicWidths = calculateRatioWithMinimum(remainingWidth, dynamicRatios, minWidths)
+		} else {
+			dynamicWidths = calculateRatio(remainingWidth, dynamicRatios)
+		}
+
+		// Assign calculated widths to dynamic cells
+		for i, cellIdx := range dynamicCells {
+			widthMatrix[cellIdx] = dynamicWidths[i]
+		}
+	} else if len(dynamicCells) > 0 {
+		// No remaining width or negative - distribute zeros
+		for _, cellIdx := range dynamicCells {
+			widthMatrix[cellIdx] = 0
+		}
 	}
 
-	return xMatrix, yMatrix
+	return widthMatrix
 }
 
 // getCellHeightMatrix return the matrix of the cell height in cells and the max value in it

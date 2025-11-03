@@ -23,6 +23,9 @@ type Cell struct {
 	// minHeight minimal height of the cell
 	minHeight int
 
+	// fixedWidth if > 0, this cell will have a fixed width instead of ratio-based
+	fixedWidth int
+
 	width  int
 	height int
 	// contentGenerator is a function that generates the content of the cell depending on the
@@ -74,6 +77,14 @@ func (r *Cell) GetContent() string {
 // This has only an effect to cells of a normal FlexBox, not a HorizontalFlexBox.
 func (r *Cell) SetMinWidth(value int) *Cell {
 	r.minWidth = value
+	return r
+}
+
+// SetFixedWidth sets a fixed width for this cell, disabling proportional sizing
+// for this specific cell. Setting to -1 or 0 will revert to dynamic sizing.
+// This has only an effect to cells of a normal FlexBox, not a HorizontalFlexBox.
+func (r *Cell) SetFixedWidth(value int) *Cell {
+	r.fixedWidth = value
 	return r
 }
 
