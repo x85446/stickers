@@ -22,6 +22,7 @@ type model struct {
 	flexBox    *flexbox.FlexBox
 	borderType int  // 0=none, 1=normal, 2=rounded, 3=thick, 4=double
 	useFixed   bool // Toggle fixed vs dynamic
+	hideText   bool // Toggle text visibility
 }
 
 var borderTypes = []lipgloss.Border{
@@ -72,6 +73,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "f":
 			m.useFixed = !m.useFixed
 			m.rebuildFlexBox()
+		case "h":
+			m.hideText = !m.hideText
+			m.rebuildFlexBox()
 		}
 	}
 	return m, nil
@@ -93,6 +97,9 @@ func (m *model) rebuildFlexBox() {
 		cell1.SetFixedWidth(25) // Fixed sidebar width
 	}
 	cell1.SetContentGenerator(func(w, h int) string {
+		if m.hideText {
+			return ""
+		}
 		hStatus := "H dynamic"
 		wStatus := "W dynamic"
 		if m.useFixed {
@@ -107,6 +114,9 @@ func (m *model) rebuildFlexBox() {
 
 	cell2 := flexbox.NewCell(3, 1).SetStyle(m.getCellStyle(1))
 	cell2.SetContentGenerator(func(w, h int) string {
+		if m.hideText {
+			return ""
+		}
 		hStatus := "H dynamic"
 		wStatus := "W dynamic" // Always dynamic width
 		if m.useFixed {
@@ -123,6 +133,9 @@ func (m *model) rebuildFlexBox() {
 		cell3.SetFixedWidth(20) // Fixed info panel width
 	}
 	cell3.SetContentGenerator(func(w, h int) string {
+		if m.hideText {
+			return ""
+		}
 		hStatus := "H dynamic"
 		wStatus := "W dynamic"
 		if m.useFixed {
@@ -163,6 +176,9 @@ func (m *model) rebuildFlexBox() {
 		idx := i
 		label := c.label
 		cell.SetContentGenerator(func(w, h int) string {
+			if m.hideText {
+				return ""
+			}
 			hStatus := "H dynamic" // Row 2 is always dynamic height
 			wStatus := "W dynamic"
 			if m.useFixed && cells[idx].fixedWidth > 0 {
@@ -184,6 +200,9 @@ func (m *model) rebuildFlexBox() {
 		cell31.SetFixedWidth(20)
 	}
 	cell31.SetContentGenerator(func(w, h int) string {
+		if m.hideText {
+			return ""
+		}
 		hStatus := "H dynamic" // Row 3 is always dynamic height
 		wStatus := "W dynamic"
 		if m.useFixed {
@@ -197,6 +216,9 @@ func (m *model) rebuildFlexBox() {
 
 	cell32 := flexbox.NewCell(3, 5).SetStyle(m.getCellStyle(11))
 	cell32.SetContentGenerator(func(w, h int) string {
+		if m.hideText {
+			return ""
+		}
 		hStatus := "H dynamic" // Row 3 is always dynamic height
 		wStatus := "W dynamic" // Always dynamic width
 		return lipgloss.NewStyle().
@@ -207,6 +229,9 @@ func (m *model) rebuildFlexBox() {
 
 	cell33 := flexbox.NewCell(10, 5).SetStyle(m.getCellStyle(12))
 	cell33.SetContentGenerator(func(w, h int) string {
+		if m.hideText {
+			return ""
+		}
 		hStatus := "H dynamic" // Row 3 is always dynamic height
 		wStatus := "W dynamic" // Always dynamic width
 		modeText := "All Dynamic"
@@ -216,12 +241,15 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("%s\n%s\n%s, %s\n(%dx%d)\n\n't' = border\n'f' = fixed",
+			Render(fmt.Sprintf("%s\n%s\n%s, %s\n(%dx%d)\n\n't' = border\n'f' = fixed\n'h' = hide text",
 				borderNames[m.borderType], modeText, hStatus, wStatus, w, h))
 	})
 
 	cell34 := flexbox.NewCell(3, 5).SetStyle(m.getCellStyle(13))
 	cell34.SetContentGenerator(func(w, h int) string {
+		if m.hideText {
+			return ""
+		}
 		hStatus := "H dynamic" // Row 3 is always dynamic height
 		wStatus := "W dynamic" // Always dynamic width
 		return lipgloss.NewStyle().
@@ -235,6 +263,9 @@ func (m *model) rebuildFlexBox() {
 		cell35.SetFixedWidth(20)
 	}
 	cell35.SetContentGenerator(func(w, h int) string {
+		if m.hideText {
+			return ""
+		}
 		hStatus := "H dynamic" // Row 3 is always dynamic height
 		wStatus := "W dynamic"
 		if m.useFixed {
@@ -266,6 +297,9 @@ func (m *model) rebuildFlexBox() {
 
 		idx := i
 		cell.SetContentGenerator(func(w, h int) string {
+			if m.hideText {
+				return ""
+			}
 			label := fmt.Sprintf("F%d", idx+1)
 			hStatus := "H dynamic"
 			wStatus := "W dynamic"
@@ -300,8 +334,9 @@ func (m *model) getCellStyle(colorIndex int) lipgloss.Style {
 
 func (m *model) View() string {
 	header := lipgloss.NewStyle().Bold(true).
-		Render(fmt.Sprintf("Mixed Fixed/Dynamic Layout | 't' = border | 'f' = toggle fixed | Current: %s, Mode: %s",
+		Render(fmt.Sprintf("Mixed Fixed/Dynamic Layout | 't' = border | 'f' = fixed | 'h' = hide text | %s, Mode: %s, Text: %s",
 			borderNames[m.borderType],
-			map[bool]string{true: "Fixed", false: "Dynamic"}[m.useFixed]))
+			map[bool]string{true: "Fixed", false: "Dynamic"}[m.useFixed],
+			map[bool]string{true: "Hidden", false: "Visible"}[m.hideText]))
 	return header + "\n" + m.flexBox.Render()
 }
