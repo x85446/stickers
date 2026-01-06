@@ -17,6 +17,7 @@ flex-box-fixed-rows
 flex-box-fixed-width
 flex-box-mixed-fixed
 flex-box-cell-config
+flex-box-row-align
 example/flex-box-with-table/flex-box-with-table
 example/table-simple-string/table-simple-string
 example/table-multi-type/table-multi-type

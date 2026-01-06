@@ -1,4 +1,4 @@
-.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 demo-10 demo-10-log demo-11 log log-follow help clean
+.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 demo-10 demo-10-log demo-11 demo-12 log log-follow help clean
 
 help:
 	@echo "Available demos (press 'q' or Ctrl+C to exit):"
@@ -37,6 +37,9 @@ help:
 	@echo ""
 	@echo "  make demo-11 - FlexBox Interactive Cell Config"
 	@echo "                 Configure individual cells interactively (A-T, w, h, T, H, ESC)"
+	@echo ""
+	@echo "  make demo-12 - FlexBox Row Alignment"
+	@echo "                 Demonstrates SetRowAlign for varying row widths (a)"
 	@echo ""
 	@echo "Logging commands:"
 	@echo "  make demo-10-log - Run demo-10 with size logging"
@@ -83,6 +86,9 @@ demo-10-log:
 demo-11:
 	@go run ./example/flex-box-cell-config/main.go
 
+demo-12:
+	@go run ./example/flex-box-row-align/main.go
+
 log:
 	@if [ -f demo10_size_log.txt ]; then \
 		echo "=== Viewing last 50 lines of demo10_size_log.txt ==="; \
@@ -102,7 +108,7 @@ clean:
 	@rm -f demo10_size_log.txt
 	@rm -f main
 	@rm -f flex-box-simple flex-box-horizonal flex-box-nested-borders flex-box-simple-borders
-	@rm -f flex-box-fixed-rows flex-box-fixed-width flex-box-mixed-fixed flex-box-cell-config
+	@rm -f flex-box-fixed-rows flex-box-fixed-width flex-box-mixed-fixed flex-box-cell-config flex-box-row-align
 	@rm -f example/flex-box-with-table/flex-box-with-table
 	@rm -f example/table-simple-string/table-simple-string
 	@rm -f example/table-multi-type/table-multi-type

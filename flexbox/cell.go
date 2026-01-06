@@ -167,11 +167,16 @@ func (r *Cell) getMaxHeight() int {
 }
 
 func (r *Cell) getExtraWidth() int {
-	return r.style.GetHorizontalFrameSize()
+	// Only subtract border and margin, not padding.
+	// lipgloss Width() sets the content area INCLUDING padding,
+	// so we must not double-subtract padding.
+	return r.style.GetHorizontalBorderSize() + r.style.GetHorizontalMargins()
 }
 
 func (r *Cell) getExtraHeight() int {
-	return r.style.GetVerticalFrameSize()
+	// Only subtract border and margin, not padding.
+	// lipgloss Height() sets the content area INCLUDING padding.
+	return r.style.GetVerticalBorderSize() + r.style.GetVerticalMargins()
 }
 
 func (r *Cell) copy() Cell {
