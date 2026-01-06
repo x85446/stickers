@@ -1,4 +1,4 @@
-module github.com/76creates/stickers
+module github.com/x85446/stickers
 
 go 1.23
 
