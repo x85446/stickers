@@ -50,44 +50,44 @@ help:
 	@echo "  make clean       - Remove log files and build artifacts"
 
 demo-1:
-	@go run ./example/flex-box-simple/main.go
+	@go run ./example/demo-1-flex-box-simple/main.go
 
 demo-2:
-	@go run ./example/flex-box-horizonal/main.go
+	@go run ./example/demo-2-flex-box-horizonal/main.go
 
 demo-3:
-	@cd example/flex-box-with-table && go run main.go
+	@cd example/demo-3-flex-box-with-table && go run main.go
 
 demo-4:
-	@cd example/table-simple-string && go run main.go
+	@cd example/demo-4-table-simple-string && go run main.go
 
 demo-5:
-	@cd example/table-multi-type && go run main.go
+	@cd example/demo-5-table-multi-type && go run main.go
 
 demo-6:
-	@go run ./example/flex-box-nested-borders/main.go
+	@go run ./example/demo-6-flex-box-nested-borders/main.go
 
 demo-7:
-	@go run ./example/flex-box-simple-borders/main.go
+	@go run ./example/demo-7-flex-box-simple-borders/main.go
 
 demo-8:
-	@go run ./example/flex-box-fixed-rows/main.go
+	@go run ./example/demo-8-flex-box-fixed-rows/main.go
 
 demo-9:
-	@go run ./example/flex-box-fixed-width/main.go
+	@go run ./example/demo-9-flex-box-fixed-width/main.go
 
 demo-10:
-	@go run ./example/flex-box-mixed-fixed/main.go
+	@go run ./example/demo-10-flex-box-mixed-fixed/main.go
 
 demo-10-log:
 	@echo "Starting demo-10 with logging to demo10_size_log.txt..."
-	@go run ./example/flex-box-mixed-fixed/main_with_log.go
+	@go run ./example/demo-10-flex-box-mixed-fixed/main_with_log.go
 
 demo-11:
-	@go run ./example/flex-box-cell-config/main.go
+	@go run ./example/demo-11-flex-box-cell-config/main.go
 
 demo-12:
-	@go run ./example/flex-box-row-align/main.go
+	@go run ./example/demo-12-flex-box-row-align/main.go
 
 log:
 	@if [ -f demo10_size_log.txt ]; then \
@@ -107,10 +107,10 @@ clean:
 	@-pkill -f "go-build.*main" 2>/dev/null || true
 	@rm -f demo10_size_log.txt
 	@rm -f main
-	@rm -f flex-box-simple flex-box-horizonal flex-box-nested-borders flex-box-simple-borders
-	@rm -f flex-box-fixed-rows flex-box-fixed-width flex-box-mixed-fixed flex-box-cell-config flex-box-row-align
-	@rm -f example/flex-box-with-table/flex-box-with-table
-	@rm -f example/table-simple-string/table-simple-string
-	@rm -f example/table-multi-type/table-multi-type
+	@rm -f demo-1-flex-box-simple demo-2-flex-box-horizonal demo-6-flex-box-nested-borders demo-7-flex-box-simple-borders
+	@rm -f demo-8-flex-box-fixed-rows demo-9-flex-box-fixed-width demo-10-flex-box-mixed-fixed demo-11-flex-box-cell-config demo-12-flex-box-row-align
+	@rm -f example/demo-3-flex-box-with-table/demo-3-flex-box-with-table
+	@rm -f example/demo-4-table-simple-string/demo-4-table-simple-string
+	@rm -f example/demo-5-table-multi-type/demo-5-table-multi-type
 	@go clean
 	@echo "Done."

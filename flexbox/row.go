@@ -143,10 +143,20 @@ func (r *Row) render(inherited ...lipgloss.Style) string {
 	for _, cell := range r.cells {
 		renderedCells = append(renderedCells, cell.render(inheritedStyle...))
 	}
+	joined := lipgloss.JoinHorizontal(lipgloss.Top, renderedCells...)
+
+	// Check if row content is narrower than allocated width (e.g., fixed-width cells)
+	// If so, don't force full width - let JoinVertical handle alignment
+	actualWidth := lipgloss.Width(joined)
+	if actualWidth < r.getMaxWidth() {
+		return r.style.
+			Height(r.getContentHeight()).MaxHeight(r.getMaxHeight()).
+			Render(joined)
+	}
 	return r.style.
 		Width(r.getContentWidth()).MaxWidth(r.getMaxWidth()).
 		Height(r.getContentHeight()).MaxHeight(r.getMaxHeight()).
-		Render(lipgloss.JoinHorizontal(lipgloss.Top, renderedCells...))
+		Render(joined)
 }
 
 func (r *Row) setRecalculate() {
