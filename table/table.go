@@ -9,7 +9,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/76creates/stickers/flexbox"
+	"github.com/x85446/stickers/flexbox"
 	"github.com/charmbracelet/lipgloss"
 )
 

@@ -5,8 +5,8 @@ import (
 	"os"
 	"unicode"
 
-	"github.com/76creates/stickers/flexbox"
-	"github.com/76creates/stickers/table"
+	"github.com/x85446/stickers/flexbox"
+	"github.com/x85446/stickers/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/gocarina/gocsv"

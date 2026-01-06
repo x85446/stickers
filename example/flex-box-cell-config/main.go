@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/76creates/stickers/flexbox"
+	"github.com/x85446/stickers/flexbox"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )

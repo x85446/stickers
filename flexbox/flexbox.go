@@ -20,6 +20,10 @@ type FlexBox struct {
 	// recalculateFlag indicates if next render should make calculations regarding
 	// the rows objects height
 	recalculateFlag bool
+
+	// rowAlign controls horizontal alignment when joining rows of varying width
+	// Default: lipgloss.Left (for backwards compatibility)
+	rowAlign lipgloss.Position
 }
 
 // New initialize FlexBox object with defaults
@@ -30,6 +34,7 @@ func New(width, height int) *FlexBox {
 		fixedRowHeight:  -1,
 		style:           lipgloss.NewStyle(),
 		recalculateFlag: false,
+		rowAlign:        lipgloss.Left,
 	}
 	return r
 }
@@ -47,6 +52,14 @@ func (r *FlexBox) SetStyle(style lipgloss.Style) *FlexBox {
 // StylePassing set whether the style should be passed to the rows
 func (r *FlexBox) StylePassing(value bool) *FlexBox {
 	r.styleAncestor = value
+	return r
+}
+
+// SetRowAlign sets the horizontal alignment used when joining rows vertically.
+// Use lipgloss.Left, lipgloss.Center, or lipgloss.Right.
+// Default is lipgloss.Left for backwards compatibility.
+func (r *FlexBox) SetRowAlign(align lipgloss.Position) *FlexBox {
+	r.rowAlign = align
 	return r
 }
 
@@ -170,11 +183,10 @@ func (r *FlexBox) Render() string {
 	for _, row := range r.rows {
 		renderedRows = append(renderedRows, row.render(inheritedStyle...))
 	}
-	// TODO: allow setting join align value for rows of variable width
 	return r.style.
 		Width(r.getContentWidth()).MaxWidth(r.getMaxWidth()).
 		Height(r.getContentHeight()).MaxHeight(r.getMaxHeight()).
-		Render(lipgloss.JoinVertical(lipgloss.Left, renderedRows...))
+		Render(lipgloss.JoinVertical(r.rowAlign, renderedRows...))
 }
 
 // ForceRecalculate forces the recalculation for the box and all the rows
