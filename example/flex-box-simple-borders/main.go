@@ -77,7 +77,7 @@ func main() {
 					Width(w).
 					Height(h).
 					Align(lipgloss.Center, lipgloss.Center).
-					Render(borderNames[m.borderType])
+					Render(borderNames[m.borderType] + " (t)")
 			}),
 			flexbox.NewCell(3, 5),
 			flexbox.NewCell(2, 5),
@@ -149,6 +149,5 @@ func (m *model) updateStyles() {
 }
 
 func (m *model) View() string {
-	header := lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("Press 't' to toggle | Current: %s", borderNames[m.borderType]))
-	return header + "\n" + m.flexBox.Render()
+	return m.flexBox.Render()
 }

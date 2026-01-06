@@ -41,7 +41,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "t":
+		case "m":
 			m.useFixed = !m.useFixed
 			m.rebuildFlexBox()
 		}
@@ -61,9 +61,9 @@ func (m *model) rebuildFlexBox() {
 		Foreground(lipgloss.Color("#ffffff")).
 		Bold(true))
 
-	modeText := "Dynamic (all columns use ratios)"
+	modeText := "Dynamic (m)"
 	if m.useFixed {
-		modeText = "Fixed (Sidebar=20, Info=25, Content=remaining)"
+		modeText = "Fixed (m)"
 	}
 
 	headerCell.SetContentGenerator(func(w, h int) string {
@@ -71,7 +71,7 @@ func (m *model) rebuildFlexBox() {
 			Width(w).
 			Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Column Width Demo - Mode: %s\nPress 't' to toggle", modeText))
+			Render(fmt.Sprintf("Column Width Demo - Mode: %s", modeText))
 	})
 	headerRow.AddCells(headerCell)
 
@@ -84,11 +84,15 @@ func (m *model) rebuildFlexBox() {
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("#26de81")))
 	sidebarCell.SetContentGenerator(func(w, h int) string {
+		setting := "[1:1 = 1/5w 1/3h]"
+		if m.useFixed {
+			setting = "[fixed W:20]"
+		}
 		return lipgloss.NewStyle().
 			Width(w).
 			Height(h).
 			Padding(1).
-			Render(fmt.Sprintf("Sidebar\n\nWidth: %d\nHeight: %d\n\n• Home\n• About\n• Settings\n• Profile", w, h))
+			Render(fmt.Sprintf("Sidebar %s\n%dx%d\n• Home\n• About\n• Settings\n• Profile", setting, w+2, h+2))
 	})
 	if m.useFixed {
 		sidebarCell.SetFixedWidth(20)
@@ -100,24 +104,20 @@ func (m *model) rebuildFlexBox() {
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("#fd9644")))
 	contentCell.SetContentGenerator(func(w, h int) string {
-		fixedInfo := ""
+		mode := "Dynamic (m)"
+		setting := "[3:1 = 3/5w 1/3h]"
+		desc := "Sidebar=1/5, Content=3/5, Info=1/5"
 		if m.useFixed {
-			fixedInfo = "\n\nWith fixed widths:\n" +
-				"• Sidebar stays at 20 chars\n" +
-				"• Info panel stays at 25 chars\n" +
-				"• Content takes all remaining space"
-		} else {
-			fixedInfo = "\n\nWith dynamic widths:\n" +
-				"• Sidebar gets 1/5 of total width\n" +
-				"• Content gets 3/5 of total width\n" +
-				"• Info panel gets 1/5 of total width"
+			mode = "Fixed (m)"
+			setting = "[remaining]"
+			desc = "Sidebar=20, Info=25, Content=remaining"
 		}
 
 		return lipgloss.NewStyle().
 			Width(w).
 			Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Main Content Area\n%dx%d%s", w, h, fixedInfo))
+			Render(fmt.Sprintf("Fixed Column Widths Demo\n%s %dx%d\n\nMode: %s\n%s", setting, w+2, h+2, mode, desc))
 	})
 	// Content cell never has fixed width - always dynamic
 
@@ -127,11 +127,15 @@ func (m *model) rebuildFlexBox() {
 		Border(lipgloss.ThickBorder()).
 		BorderForeground(lipgloss.Color("#a55eea")))
 	infoCell.SetContentGenerator(func(w, h int) string {
+		setting := "[1:1 = 1/5w 1/3h]"
+		if m.useFixed {
+			setting = "[fixed W:25]"
+		}
 		return lipgloss.NewStyle().
 			Width(w).
 			Height(h).
 			Padding(1).
-			Render(fmt.Sprintf("Info Panel\n\nWidth: %d\nHeight: %d\n\n📊 Stats\n📈 Charts\n🔔 Alerts", w, h))
+			Render(fmt.Sprintf("Info %s\n%dx%d\n📊 Stats\n📈 Charts\n🔔 Alerts", setting, w+2, h+2))
 	})
 	if m.useFixed {
 		infoCell.SetFixedWidth(25)
@@ -151,7 +155,7 @@ func (m *model) rebuildFlexBox() {
 			Width(w).
 			Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Terminal: %dx%d | Press 'q' to quit | 't' to toggle fixed widths", m.termWidth, m.termHeight))
+			Render(fmt.Sprintf("Terminal: %dx%d", m.termWidth, m.termHeight))
 	})
 	footerRow.AddCells(footerCell)
 

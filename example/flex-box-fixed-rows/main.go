@@ -41,7 +41,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "t":
+		case "m":
 			m.useFixed = !m.useFixed
 			m.rebuildFlexBox()
 		}
@@ -61,11 +61,15 @@ func (m *model) rebuildFlexBox() {
 		Foreground(lipgloss.Color("#ffffff")).
 		Bold(true))
 	headerCell.SetContentGenerator(func(w, h int) string {
+		setting := "[1:1 = 1/1w 1/4h]"
+		if m.useFixed {
+			setting = "[fixed H:3]"
+		}
 		return lipgloss.NewStyle().
 			Width(w).
 			Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("HEADER\n%dx%d", w, h))
+			Render(fmt.Sprintf("HEADER %s\n%dx%d", setting, w, h))
 	})
 	headerRow.AddCells(headerCell)
 
@@ -87,7 +91,7 @@ func (m *model) rebuildFlexBox() {
 			Width(w).
 			Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Sidebar\n%dx%d", w, h))
+			Render(fmt.Sprintf("Sidebar\n[1:2 = 1/4w 2/4h]\n%dx%d", w+2, h+2))
 	})
 
 	// Main content cell
@@ -96,17 +100,20 @@ func (m *model) rebuildFlexBox() {
 		Border(lipgloss.NormalBorder()).
 		BorderForeground(lipgloss.Color("#45aaf2")))
 
-	modeText := "Dynamic"
-	if m.useFixed {
-		modeText = "Fixed (Header=3, Footer=3)"
-	}
-
 	mainCell.SetContentGenerator(func(w, h int) string {
+		mode := "Dynamic (m)"
+		setting := "[3:2 = 3/4w 2/4h]"
+		desc := "Header/Footer use ratio heights"
+		if m.useFixed {
+			mode = "Fixed (m)"
+			setting = "[3:2 = 3/4w 2/4h]"
+			desc = "Header/Footer fixed at 3 rows"
+		}
 		return lipgloss.NewStyle().
 			Width(w).
 			Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Main Content Area\nMode: %s\nSize: %dx%d\n\nPress 't' to toggle fixed heights", modeText, w, h))
+			Render(fmt.Sprintf("Fixed Row Heights Demo\n%s %dx%d\n\nMode: %s\n%s", setting, w+2, h+2, mode, desc))
 	})
 
 	contentRow.AddCells(sidebarCell, mainCell)
@@ -120,11 +127,15 @@ func (m *model) rebuildFlexBox() {
 		Foreground(lipgloss.Color("#000000")).
 		Bold(true))
 	footerCell.SetContentGenerator(func(w, h int) string {
+		setting := "[1:1 = 1/1w 1/4h]"
+		if m.useFixed {
+			setting = "[fixed H:3]"
+		}
 		return lipgloss.NewStyle().
 			Width(w).
 			Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("FOOTER\n%dx%d", w, h))
+			Render(fmt.Sprintf("FOOTER %s\n%dx%d", setting, w, h))
 	})
 	footerRow.AddCells(footerCell)
 

@@ -1,2 +1,26 @@
 .idea/
 vendor/
+
+# Warden local configuration
+.warden.local/
+.warden/.env
+.warden.bak/
+.vscode
+.warden
+
+# Demo binaries
+main
+flex-box-simple
+flex-box-horizonal
+flex-box-nested-borders
+flex-box-simple-borders
+flex-box-fixed-rows
+flex-box-fixed-width
+flex-box-mixed-fixed
+flex-box-cell-config
+example/flex-box-with-table/flex-box-with-table
+example/table-simple-string/table-simple-string
+example/table-multi-type/table-multi-type
+
+# Log files
+demo10_size_log.txt

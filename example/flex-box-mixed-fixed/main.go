@@ -70,7 +70,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "t":
 			m.borderType = (m.borderType + 1) % len(borderTypes)
 			m.rebuildFlexBox()
-		case "f":
+		case "m":
 			m.useFixed = !m.useFixed
 			m.rebuildFlexBox()
 		case "h":
@@ -109,7 +109,7 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Sidebar\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+			Render(fmt.Sprintf("Sidebar\n%s, %s\n(%dx%d)", hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
 	cell2 := flexbox.NewCell(3, 1).SetStyle(m.getCellStyle(1))
@@ -125,7 +125,7 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Header Area\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+			Render(fmt.Sprintf("Header Area\n%s, %s\n(%dx%d)", hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
 	cell3 := flexbox.NewCell(1, 1).SetStyle(m.getCellStyle(2))
@@ -145,7 +145,7 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Info\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+			Render(fmt.Sprintf("Info\n%s, %s\n(%dx%d)", hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
 	row1.AddCells(cell1, cell2, cell3)
@@ -187,7 +187,7 @@ func (m *model) rebuildFlexBox() {
 			return lipgloss.NewStyle().
 				Width(w).Height(h).
 				Align(lipgloss.Center, lipgloss.Center).
-				Render(fmt.Sprintf("%s\n%s, %s\n(%dx%d)", label, hStatus, wStatus, w, h))
+				Render(fmt.Sprintf("%s\n%s, %s\n(%dx%d)", label, hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 		})
 		row2.AddCells(cell)
 	}
@@ -211,7 +211,7 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Left\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+			Render(fmt.Sprintf("Left\n%s, %s\n(%dx%d)", hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
 	cell32 := flexbox.NewCell(3, 5).SetStyle(m.getCellStyle(11))
@@ -224,7 +224,7 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Center\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+			Render(fmt.Sprintf("Center\n%s, %s\n(%dx%d)", hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
 	cell33 := flexbox.NewCell(10, 5).SetStyle(m.getCellStyle(12))
@@ -232,17 +232,17 @@ func (m *model) rebuildFlexBox() {
 		if m.hideText {
 			return lipgloss.NewStyle().Width(w).Height(h).Render("")
 		}
-		hStatus := "H dynamic" // Row 3 is always dynamic height
-		wStatus := "W dynamic" // Always dynamic width
-		modeText := "All Dynamic"
+		modeText := "Dynamic (m)"
+		modeDesc := "All cells use ratios [X:Y = X/Tw Y/Th]"
 		if m.useFixed {
-			modeText = "Mixed Fixed/Dynamic"
+			modeText = "Fixed (m)"
+			modeDesc = "Some cells have fixed W or H"
 		}
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("%s\n%s\n%s, %s\n(%dx%d)\n\n't' = border\n'f' = fixed\n'h' = hide text",
-				borderNames[m.borderType], modeText, hStatus, wStatus, w, h))
+			Render(fmt.Sprintf("Mixed Fixed/Dynamic Demo\n%s (t) | Text (h)\n%s\n%s\n%dx%d",
+				borderNames[m.borderType], modeText, modeDesc, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
 	cell34 := flexbox.NewCell(3, 5).SetStyle(m.getCellStyle(13))
@@ -255,7 +255,7 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Dynamic\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+			Render(fmt.Sprintf("Dynamic\n%s, %s\n(%dx%d)", hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
 	cell35 := flexbox.NewCell(2, 5).SetStyle(m.getCellStyle(14))
@@ -274,7 +274,7 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Right\n%s, %s\n(%dx%d)", hStatus, wStatus, w, h))
+			Render(fmt.Sprintf("Right\n%s, %s\n(%dx%d)", hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
 	row3.AddCells(cell31, cell32, cell33, cell34, cell35)
@@ -313,7 +313,7 @@ func (m *model) rebuildFlexBox() {
 			return lipgloss.NewStyle().
 				Width(w).Height(h).
 				Align(lipgloss.Center, lipgloss.Center).
-				Render(fmt.Sprintf("%s\n%s, %s\n(%dx%d)", label, hStatus, wStatus, w, h))
+				Render(fmt.Sprintf("%s\n%s, %s\n(%dx%d)", label, hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 		})
 		row4.AddCells(cell)
 	}
@@ -332,11 +332,13 @@ func (m *model) getCellStyle(colorIndex int) lipgloss.Style {
 		BorderForeground(lipgloss.Color(colors[colorIndex]))
 }
 
+func (m *model) borderOffset() int {
+	if m.borderType == 0 {
+		return 0
+	}
+	return 2
+}
+
 func (m *model) View() string {
-	header := lipgloss.NewStyle().Bold(true).
-		Render(fmt.Sprintf("Mixed Fixed/Dynamic Layout | 't' = border | 'f' = fixed | 'h' = hide text | %s, Mode: %s, Text: %s",
-			borderNames[m.borderType],
-			map[bool]string{true: "Fixed", false: "Dynamic"}[m.useFixed],
-			map[bool]string{true: "Hidden", false: "Visible"}[m.hideText]))
-	return header + "\n" + m.flexBox.Render()
+	return m.flexBox.Render()
 }

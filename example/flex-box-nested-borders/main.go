@@ -34,13 +34,13 @@ var (
 	}
 )
 
-type model struct {
+type thingy struct {
 	flexBox    *flexbox.FlexBox
 	borderType int // 0=normal, 1=rounded, 2=thick, 3=double
 }
 
 func main() {
-	m := model{
+	m := thingy{
 		flexBox:    flexbox.New(0, 0),
 		borderType: 1, // Start with rounded border
 	}
@@ -77,7 +77,7 @@ func createNestedFlexBox(width, height, depth, borderType int) string {
 			Height(height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Foreground(lipgloss.Color("#ffffff"))
-		return style.Render(fmt.Sprintf("Depth: %d\n%s", depth, borderNames[borderType]))
+		return style.Render(fmt.Sprintf("Depth: %d\n%s (t)", depth, borderNames[borderType]))
 	}
 
 	// Create a FlexBox for this level
@@ -103,9 +103,9 @@ func createNestedFlexBox(width, height, depth, borderType int) string {
 	return box.Render()
 }
 
-func (m *model) Init() tea.Cmd { return nil }
+func (m *thingy) Init() tea.Cmd { return nil }
 
-func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m *thingy) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.flexBox.SetWidth(msg.Width)
@@ -121,7 +121,6 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *model) View() string {
-	header := lipgloss.NewStyle().Bold(true).Render(fmt.Sprintf("Press 't' to toggle | Current: %s", borderNames[m.borderType]))
-	return header + "\n" + m.flexBox.Render()
+func (m *thingy) View() string {
+	return m.flexBox.Render()
 }

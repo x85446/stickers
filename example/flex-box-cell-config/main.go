@@ -19,12 +19,12 @@ var (
 		"#2d98da", "#3867d6", "#8854d0", "#a5b1c2", "#4b6584",
 	}
 
-	// Cell labels A-T (20 cells total)
+	// Cell labels (20 cells, skipping H and T which are used for commands)
 	cellLabels = []string{
 		"A", "B", "C", // Row 1
-		"D", "E", "F", "G", "H", "I", "J", // Row 2
-		"K", "L", "M", "N", "O", // Row 3
-		"P", "Q", "R", "S", "T", // Row 4
+		"D", "E", "F", "G", "I", "J", "K", // Row 2 (skip H - used for hide text)
+		"L", "M", "N", "O", "P", // Row 3
+		"Q", "R", "S", "U", "V", // Row 4 (skip T - used for border toggle)
 	}
 )
 
@@ -52,7 +52,7 @@ type model struct {
 	hideText       bool              // Toggle text visibility
 	cellConfigs    map[string]*CellConfig // Per-cell configuration
 	configMode     ConfigMode        // Current configuration mode
-	selectedCell   string            // Currently selected cell (A-T)
+	selectedCell   string            // Currently selected cell (A-V, skip H/T)
 	settingType    string            // What we're setting (width, height, ratioX, ratioY)
 	inputBuffer    string            // Buffer for numeric input
 	firstInput     bool              // True if we haven't typed yet in value mode
@@ -94,17 +94,17 @@ func main() {
 func initCellConfigs() map[string]*CellConfig {
 	configs := make(map[string]*CellConfig)
 
-	// Default configurations for all cells
+	// Default configurations for all cells (skip H and T - used for commands)
 	defaultRatios := map[string][2]int{
 		// Row 1
 		"A": {1, 3}, "B": {3, 3}, "C": {1, 3},
-		// Row 2
+		// Row 2 (skip H)
 		"D": {2, 4}, "E": {2, 4}, "F": {3, 4}, "G": {3, 4},
-		"H": {3, 4}, "I": {4, 4}, "J": {4, 4},
+		"I": {3, 4}, "J": {4, 4}, "K": {4, 4},
 		// Row 3
-		"K": {2, 5}, "L": {3, 5}, "M": {10, 5}, "N": {3, 5}, "O": {2, 5},
-		// Row 4
-		"P": {1, 4}, "Q": {1, 4}, "R": {1, 4}, "S": {1, 4}, "T": {1, 4},
+		"L": {2, 5}, "M": {3, 5}, "N": {10, 5}, "O": {3, 5}, "P": {2, 5},
+		// Row 4 (skip T)
+		"Q": {1, 4}, "R": {1, 4}, "S": {1, 4}, "U": {1, 4}, "V": {1, 4},
 	}
 
 	for label, ratios := range defaultRatios {
@@ -290,25 +290,25 @@ func (m *model) rebuildFlexBox() {
 		row1.AddCells(cell)
 	}
 
-	// Row 2: D-J (7 cells)
+	// Row 2: D-K (7 cells, skip H)
 	row2 := m.flexBox.NewRow()
-	row2Cells := []string{"D", "E", "F", "G", "H", "I", "J"}
+	row2Cells := []string{"D", "E", "F", "G", "I", "J", "K"}
 	for i, label := range row2Cells {
 		cell := m.createCell(label, i+3)
 		row2.AddCells(cell)
 	}
 
-	// Row 3: K-O (5 cells)
+	// Row 3: L-P (5 cells)
 	row3 := m.flexBox.NewRow()
-	row3Cells := []string{"K", "L", "M", "N", "O"}
+	row3Cells := []string{"L", "M", "N", "O", "P"}
 	for i, label := range row3Cells {
 		cell := m.createCell(label, i+10)
 		row3.AddCells(cell)
 	}
 
-	// Row 4: P-T (5 cells)
+	// Row 4: Q-V (5 cells, skip T)
 	row4 := m.flexBox.NewRow()
-	row4Cells := []string{"P", "Q", "R", "S", "T"}
+	row4Cells := []string{"Q", "R", "S", "U", "V"}
 	for i, label := range row4Cells {
 		cell := m.createCell(label, i+15)
 		row4.AddCells(cell)
@@ -375,7 +375,7 @@ func (m *model) renderCellInfo(label string, w, h int) string {
 	}
 
 	// Actual dimensions
-	lines = append(lines, fmt.Sprintf("Actual:%dx%d", w, h))
+	lines = append(lines, fmt.Sprintf("Actual:%dx%d", w+m.borderOffset(), h+m.borderOffset()))
 
 	content := strings.Join(lines, "\n")
 
@@ -472,24 +472,28 @@ func (m *model) getCellStyle(colorIndex int) lipgloss.Style {
 		BorderForeground(lipgloss.Color(colors[colorIndex]))
 }
 
+func (m *model) borderOffset() int {
+	if m.borderType == 0 {
+		return 0
+	}
+	return 2
+}
+
 func (m *model) View() string {
 	// Build status text based on mode
 	var status string
 	switch m.configMode {
 	case ModeNormal:
-		status = "Press A-T to config cell | T: border | H: hide | Q: quit"
+		status = fmt.Sprintf("%s (T) | Text (H) | Select cell (A-V, skip H/T)", borderNames[m.borderType])
 	case ModeConfiguring:
 		config := m.cellConfigs[m.selectedCell]
-		status = fmt.Sprintf("Configuring [%s] | W:%v H:%v | Press ESC to exit",
+		status = fmt.Sprintf("[%s] W:%v H:%v | (w) width (h) height (ESC) exit",
 			m.selectedCell, config.UseFixedWidth, config.UseFixedHeight)
 	case ModeSettingValue:
-		status = fmt.Sprintf("Setting %s for [%s]: %s",
+		status = fmt.Sprintf("Setting %s for [%s]: %s | (Enter) confirm (ESC) cancel",
 			m.settingType, m.selectedCell, m.inputBuffer)
 	}
 
-	header := lipgloss.NewStyle().Bold(true).
-		Render(fmt.Sprintf("Cell Configuration Demo | %s | %s",
-			borderNames[m.borderType], status))
-
+	header := lipgloss.NewStyle().Bold(true).Render(status)
 	return header + "\n" + m.flexBox.Render()
 }
