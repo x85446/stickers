@@ -15,10 +15,31 @@ import (
 var selectedValue string = "\nselect something with spacebar or enter"
 
 type model struct {
-	table   *table.Table
-	infoBox *flexbox.FlexBox
-	headers []string
+	table     *table.Table
+	infoBox   *flexbox.FlexBox
+	headers   []string
+	showAbout bool
+	width     int
+	height    int
 }
+
+const aboutText = `Demo 5: Table Multi-Type
+
+Table with typed columns for proper sorting.
+
+Unlike demo-4 (string-only), this demo uses gocsv
+to parse CSV data with typed columns (int, string).
+
+This enables proper numeric sorting: integers sort
+numerically (1, 2, 10) instead of lexically (1, 10, 2).
+
+Navigation:
+- Arrow keys: Move cursor
+- Ctrl+S: Sort by column (numeric or alpha)
+- Enter/Space: Select cell value
+- Type to filter
+
+Press 'a' to close | 'q' to quit`
 
 func main() {
 	// read in CSV data
@@ -105,13 +126,18 @@ func (m *model) Init() tea.Cmd { return nil }
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.table.SetWidth(msg.Width)
 		m.table.SetHeight(msg.Height - m.infoBox.GetHeight())
 		m.infoBox.SetWidth(msg.Width)
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "ctrl+c":
+		case "ctrl+c", "q":
 			return m, tea.Quit
+		case "a":
+			m.showAbout = !m.showAbout
+			return m, nil
 		case "down":
 			m.table.CursorDown()
 		case "up":
@@ -169,6 +195,19 @@ func (m *model) filterWithStr(key string) {
 	m.table.SetFilter(i, s)
 }
 
+var aboutStyle = lipgloss.NewStyle().
+	Padding(2, 4).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#874BFD")).
+	Background(lipgloss.Color("#1a1a2e"))
+
 func (m *model) View() string {
-	return lipgloss.JoinVertical(lipgloss.Left, m.table.Render(), m.infoBox.Render())
+	content := lipgloss.JoinVertical(lipgloss.Left, m.table.Render(), m.infoBox.Render())
+	if m.showAbout {
+		overlay := aboutStyle.Render(aboutText)
+		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+	}
+	return content
 }

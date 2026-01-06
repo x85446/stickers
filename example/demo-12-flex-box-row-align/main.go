@@ -19,7 +19,25 @@ var (
 type model struct {
 	flexBox   *flexbox.FlexBox
 	alignType int // 0=left, 1=center, 2=right
+	showAbout bool
+	width     int
+	height    int
 }
+
+const aboutText = `Demo 12: Row Alignment
+
+Demonstrates SetRowAlign for FlexBox.
+
+When rows have varying widths (e.g., from fixed-width
+cells or borders), SetRowAlign controls horizontal
+alignment of the rendered rows.
+
+Press 'r' to cycle: Left → Center → Right
+
+Rows 6 & 7 have fixed 140-width to clearly show
+alignment changes. Other rows take full width.
+
+Press 'a' to close | 'q' to quit`
 
 var alignTypes = []lipgloss.Position{
 	lipgloss.Left,
@@ -51,6 +69,8 @@ func (m *model) Init() tea.Cmd { return nil }
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.flexBox.SetWidth(msg.Width)
 		m.flexBox.SetHeight(msg.Height)
 		m.rebuildFlexBox()
@@ -59,6 +79,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c", "q":
 			return m, tea.Quit
 		case "a":
+			m.showAbout = !m.showAbout
+		case "r":
 			m.alignType = (m.alignType + 1) % len(alignTypes)
 			m.rebuildFlexBox()
 		}
@@ -80,7 +102,7 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Row 1: Thick Border\nAlign: %s (a)\n%dx%d", alignNames[m.alignType], w+2, h+2))
+			Render(fmt.Sprintf("Row 1: Thick Border\nAlign: %s (r)\n%dx%d", alignNames[m.alignType], w+2, h+2))
 	})
 	row1.AddCells(cell1)
 
@@ -164,7 +186,7 @@ func (m *model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Row 6: Rounded Border\nPress (a) to cycle alignment\n%dx%d", w+2, h+2))
+			Render(fmt.Sprintf("Row 6: Rounded Border\nPress (r) to cycle alignment\n%dx%d", w+2, h+2))
 	})
 	row6.AddCells(cell6)
 
@@ -185,6 +207,19 @@ func (m *model) rebuildFlexBox() {
 	m.flexBox.ForceRecalculate()
 }
 
+var aboutStyle = lipgloss.NewStyle().
+	Padding(2, 4).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#874BFD")).
+	Background(lipgloss.Color("#1a1a2e"))
+
 func (m *model) View() string {
-	return m.flexBox.Render()
+	content := m.flexBox.Render()
+	if m.showAbout {
+		overlay := aboutStyle.Render(aboutText)
+		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+	}
+	return content
 }

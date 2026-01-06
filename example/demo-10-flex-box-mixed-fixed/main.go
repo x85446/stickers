@@ -23,7 +23,25 @@ type model struct {
 	borderType int  // 0=none, 1=normal, 2=rounded, 3=thick, 4=double
 	useFixed   bool // Toggle fixed vs dynamic
 	hideText   bool // Toggle text visibility
+	showAbout  bool
 }
+
+const aboutText = `Demo 10: Mixed Fixed/Dynamic
+
+Combines fixed and dynamic sizing in one layout.
+
+In Fixed mode:
+- Row 1: fixed height, sidebar/info fixed width
+- Row 2: dynamic height, nav/details fixed width
+- Row 3: dynamic height, left/right fixed width
+- Row 4: fixed height, first/last cell fixed width
+
+In Dynamic mode:
+- All cells use ratio-based sizing
+
+Press 'b' border | 'm' mode | 'h' hide text
+
+Press 'a' to close | 'q' to quit`
 
 var borderTypes = []lipgloss.Border{
 	{}, // no border
@@ -67,7 +85,9 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "t":
+		case "a":
+			m.showAbout = !m.showAbout
+		case "b":
 			m.borderType = (m.borderType + 1) % len(borderTypes)
 			m.rebuildFlexBox()
 		case "m":
@@ -339,6 +359,21 @@ func (m *model) borderOffset() int {
 	return 2
 }
 
+var aboutStyle = lipgloss.NewStyle().
+	Padding(2, 4).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#874BFD")).
+	Background(lipgloss.Color("#1a1a2e"))
+
 func (m *model) View() string {
-	return m.flexBox.Render()
+	content := m.flexBox.Render()
+	if m.showAbout {
+		width := m.flexBox.GetWidth()
+		height := m.flexBox.GetHeight()
+		overlay := aboutStyle.Render(aboutText)
+		content = lipgloss.Place(width, height, lipgloss.Center, lipgloss.Center, overlay,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+	}
+	return content
 }

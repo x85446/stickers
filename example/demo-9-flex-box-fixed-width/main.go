@@ -14,7 +14,25 @@ type model struct {
 	useFixed   bool
 	termWidth  int
 	termHeight int
+	showAbout  bool
 }
+
+const aboutText = `Demo 9: Fixed Column Widths
+
+Demonstrates SetFixedWidth for cells.
+
+In Fixed mode (default):
+- Sidebar: fixed 20 columns
+- Info panel: fixed 25 columns
+- Content: expands to fill remaining space
+
+In Dynamic mode:
+- All cells use ratio-based widths
+- Sidebar=1/5, Content=3/5, Info=1/5
+
+Press 'm' to toggle Fixed/Dynamic mode.
+
+Press 'a' to close | 'q' to quit`
 
 func main() {
 	m := model{
@@ -41,6 +59,8 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+		case "a":
+			m.showAbout = !m.showAbout
 		case "m":
 			m.useFixed = !m.useFixed
 			m.rebuildFlexBox()
@@ -163,11 +183,24 @@ func (m *model) rebuildFlexBox() {
 	m.flexBox.AddRows([]*flexbox.Row{headerRow, mainRow, footerRow})
 }
 
+var aboutStyle = lipgloss.NewStyle().
+	Padding(2, 4).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#874BFD")).
+	Background(lipgloss.Color("#1a1a2e"))
+
 func (m *model) View() string {
 	if m.termWidth == 0 || m.termHeight == 0 {
 		return "Initializing..."
 	}
 	m.flexBox.SetWidth(m.termWidth)
 	m.flexBox.SetHeight(m.termHeight)
-	return m.flexBox.Render()
+	content := m.flexBox.Render()
+	if m.showAbout {
+		overlay := aboutStyle.Render(aboutText)
+		content = lipgloss.Place(m.termWidth, m.termHeight, lipgloss.Center, lipgloss.Center, overlay,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+	}
+	return content
 }

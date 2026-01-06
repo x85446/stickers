@@ -37,7 +37,26 @@ var (
 type thingy struct {
 	flexBox    *flexbox.FlexBox
 	borderType int // 0=normal, 1=rounded, 2=thick, 3=double
+	showAbout  bool
+	width      int
+	height     int
 }
+
+const aboutText = `Demo 6: Nested Borders
+
+Recursive FlexBox with nested borders.
+
+Uses ContentGenerator to create infinitely nested
+FlexBoxes, each with a colored border. Nesting
+continues until the space becomes too small.
+
+The depth counter shows how many levels deep
+the recursion reached.
+
+Press 'b' to cycle border types:
+Normal → Rounded → Thick → Double
+
+Press 'a' to close | 'q' to quit`
 
 func main() {
 	m := thingy{
@@ -108,19 +127,36 @@ func (m *thingy) Init() tea.Cmd { return nil }
 func (m *thingy) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.flexBox.SetWidth(msg.Width)
 		m.flexBox.SetHeight(msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "t":
+		case "a":
+			m.showAbout = !m.showAbout
+		case "b":
 			m.borderType = (m.borderType + 1) % len(borderTypes)
 		}
 	}
 	return m, nil
 }
 
+var aboutStyle = lipgloss.NewStyle().
+	Padding(2, 4).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#874BFD")).
+	Background(lipgloss.Color("#1a1a2e"))
+
 func (m *thingy) View() string {
-	return m.flexBox.Render()
+	content := m.flexBox.Render()
+	if m.showAbout {
+		overlay := aboutStyle.Render(aboutText)
+		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+	}
+	return content
 }

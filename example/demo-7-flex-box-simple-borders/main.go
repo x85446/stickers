@@ -19,10 +19,27 @@ var (
 )
 
 type model struct {
-	flexBox        *flexbox.FlexBox
-	borderType     int // 0=none, 1=normal, 2=rounded, 3=thick, 4=double, 5=hidden
-	cellIndexes    [][]int // Store cell indexes for each row
+	flexBox     *flexbox.FlexBox
+	borderType  int       // 0=none, 1=normal, 2=rounded, 3=thick, 4=double, 5=hidden
+	cellIndexes [][]int   // Store cell indexes for each row
+	showAbout   bool
+	width       int
+	height      int
 }
+
+const aboutText = `Demo 7: Simple Borders
+
+Grid of labeled cells with different border styles.
+
+Each cell shows its label (A-T) and ratio [X:Y].
+The ratio determines relative cell size:
+- First number: width ratio within the row
+- Second number: height ratio for the row
+
+Press 'b' to cycle styles:
+Fill → Normal → Rounded → Thick → Double → Hidden
+
+Press 'a' to close | 'q' to quit`
 
 var borderTypes = []lipgloss.Border{
 	{}, // no border
@@ -153,17 +170,20 @@ func (m *model) Init() tea.Cmd { return nil }
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.flexBox.SetWidth(msg.Width)
 		m.flexBox.SetHeight(msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
-		case "t":
+		case "a":
+			m.showAbout = !m.showAbout
+		case "b":
 			m.borderType = (m.borderType + 1) % len(borderTypes)
 			m.updateStyles()
 		}
-
 	}
 	return m, nil
 }
@@ -195,6 +215,19 @@ func (m *model) updateStyles() {
 	}
 }
 
+var aboutStyle = lipgloss.NewStyle().
+	Padding(2, 4).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#874BFD")).
+	Background(lipgloss.Color("#1a1a2e"))
+
 func (m *model) View() string {
-	return m.flexBox.Render()
+	content := m.flexBox.Render()
+	if m.showAbout {
+		overlay := aboutStyle.Render(aboutText)
+		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+	}
+	return content
 }

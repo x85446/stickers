@@ -33,8 +33,32 @@ var (
 )
 
 type model struct {
-	flexBox *flexbox.FlexBox
+	flexBox   *flexbox.FlexBox
+	showAbout bool
+	width     int
+	height    int
 }
+
+const aboutText = `Demo 1: FlexBox Simple
+
+Basic grid of colored cells using ratio-based sizing.
+
+Each cell is created with NewCell(ratioX, ratioY):
+- ratioX: width ratio relative to siblings in the row
+- ratioY: height ratio relative to other rows
+
+Row 1: 3 cells [1:6] - equal width, tall
+Row 2: 7 cells with varying width ratios [2:4] to [4:4]
+Row 3: 5 cells [2:5] to [10:5] - center cell widest
+Row 4: 5 cells with varying height ratios [1:2] to [1:4]
+
+Press 'a' to close | 'q' to quit`
+
+var aboutStyle = lipgloss.NewStyle().
+	Padding(2, 4).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#874BFD")).
+	Background(lipgloss.Color("#1a1a2e"))
 
 func main() {
 	m := model{
@@ -86,17 +110,28 @@ func (m *model) Init() tea.Cmd { return nil }
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.flexBox.SetWidth(msg.Width)
 		m.flexBox.SetHeight(msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+		case "a":
+			m.showAbout = !m.showAbout
 		}
-
 	}
 	return m, nil
 }
+
 func (m *model) View() string {
-	return m.flexBox.Render()
+	content := m.flexBox.Render()
+	if m.showAbout {
+		overlay := aboutStyle.Render(aboutText)
+		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+	}
+	return content
 }

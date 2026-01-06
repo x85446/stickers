@@ -19,12 +19,12 @@ var (
 		"#2d98da", "#3867d6", "#8854d0", "#a5b1c2", "#4b6584",
 	}
 
-	// Cell labels (20 cells, skipping H and T which are used for commands)
+	// Cell labels (20 cells, starting at C, skipping H which is used for hide text)
 	cellLabels = []string{
-		"A", "B", "C", // Row 1
-		"D", "E", "F", "G", "I", "J", "K", // Row 2 (skip H - used for hide text)
-		"L", "M", "N", "O", "P", // Row 3
-		"Q", "R", "S", "U", "V", // Row 4 (skip T - used for border toggle)
+		"C", "D", "E", // Row 1
+		"F", "G", "I", "J", "K", "L", "M", // Row 2 (skip H - used for hide text)
+		"N", "O", "P", "Q", "R", // Row 3
+		"S", "T", "U", "V", "W", // Row 4
 	}
 )
 
@@ -58,7 +58,25 @@ type model struct {
 	firstInput     bool              // True if we haven't typed yet in value mode
 	termWidth      int
 	termHeight     int
+	showAbout      bool
 }
+
+const aboutText = `Demo 11: Per-Cell Configuration
+
+Interactive cell configuration demo.
+
+Select any cell (C-W) to configure it:
+- Press 'w' to toggle fixed/dynamic width
+- Press 'h' to toggle fixed/dynamic height
+- Type numbers to set values
+- Press Enter to confirm, ESC to cancel
+
+Cell labels start at C and skip H
+(H is used for hide text command).
+
+Press 'b' border | 'h' text visibility
+
+Press 'a' to close | 'q' to quit`
 
 var borderTypes = []lipgloss.Border{
 	{}, // no border
@@ -94,17 +112,17 @@ func main() {
 func initCellConfigs() map[string]*CellConfig {
 	configs := make(map[string]*CellConfig)
 
-	// Default configurations for all cells (skip H and T - used for commands)
+	// Default configurations for all cells (start at C, skip H - used for hide text)
 	defaultRatios := map[string][2]int{
 		// Row 1
-		"A": {1, 3}, "B": {3, 3}, "C": {1, 3},
+		"C": {1, 3}, "D": {3, 3}, "E": {1, 3},
 		// Row 2 (skip H)
-		"D": {2, 4}, "E": {2, 4}, "F": {3, 4}, "G": {3, 4},
-		"I": {3, 4}, "J": {4, 4}, "K": {4, 4},
+		"F": {2, 4}, "G": {2, 4}, "I": {3, 4}, "J": {3, 4},
+		"K": {3, 4}, "L": {4, 4}, "M": {4, 4},
 		// Row 3
-		"L": {2, 5}, "M": {3, 5}, "N": {10, 5}, "O": {3, 5}, "P": {2, 5},
-		// Row 4 (skip T)
-		"Q": {1, 4}, "R": {1, 4}, "S": {1, 4}, "U": {1, 4}, "V": {1, 4},
+		"N": {2, 5}, "O": {3, 5}, "P": {10, 5}, "Q": {3, 5}, "R": {2, 5},
+		// Row 4
+		"S": {1, 4}, "T": {1, 4}, "U": {1, 4}, "V": {1, 4}, "W": {1, 4},
 	}
 
 	for label, ratios := range defaultRatios {
@@ -148,9 +166,11 @@ func (m *model) handleNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := strings.ToUpper(msg.String())
 
 	switch key {
-	case "ctrl+c", "Q":
+	case "ctrl+c", "Q", "q":
 		return m, tea.Quit
-	case "T":
+	case "A":
+		m.showAbout = !m.showAbout
+	case "B":
 		m.borderType = (m.borderType + 1) % len(borderTypes)
 		m.rebuildFlexBox()
 	case "H":
@@ -479,12 +499,18 @@ func (m *model) borderOffset() int {
 	return 2
 }
 
+var aboutStyle = lipgloss.NewStyle().
+	Padding(2, 4).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#874BFD")).
+	Background(lipgloss.Color("#1a1a2e"))
+
 func (m *model) View() string {
 	// Build status text based on mode
 	var status string
 	switch m.configMode {
 	case ModeNormal:
-		status = fmt.Sprintf("%s (T) | Text (H) | Select cell (A-V, skip H/T)", borderNames[m.borderType])
+		status = fmt.Sprintf("%s (b) | Text (h) | Select cell (C-W, skip H) | About (a)", borderNames[m.borderType])
 	case ModeConfiguring:
 		config := m.cellConfigs[m.selectedCell]
 		status = fmt.Sprintf("[%s] W:%v H:%v | (w) width (h) height (ESC) exit",
@@ -495,5 +521,13 @@ func (m *model) View() string {
 	}
 
 	header := lipgloss.NewStyle().Bold(true).Render(status)
-	return header + "\n" + m.flexBox.Render()
+	content := header + "\n" + m.flexBox.Render()
+
+	if m.showAbout {
+		overlay := aboutStyle.Render(aboutText)
+		content = lipgloss.Place(m.termWidth, m.termHeight, lipgloss.Center, lipgloss.Center, overlay,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+	}
+	return content
 }

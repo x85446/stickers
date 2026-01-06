@@ -33,8 +33,31 @@ var (
 )
 
 type model struct {
-	flexBox *flexbox.HorizontalFlexBox
+	flexBox   *flexbox.HorizontalFlexBox
+	showAbout bool
+	width     int
+	height    int
 }
+
+const aboutText = `Demo 2: FlexBox Horizontal
+
+Column-based layout using HorizontalFlexBox.
+
+Unlike regular FlexBox (rows stacked vertically),
+HorizontalFlexBox arranges columns side-by-side,
+with cells stacking vertically within each column.
+
+Column 1: 2 cells [1:1] stacked vertically
+Column 2: 1 cell [2:1] - takes 2x width ratio
+Column 3: 3 cells with varying heights [1:1], [1:2], [1:1]
+
+Press 'a' to close | 'q' to quit`
+
+var aboutStyle = lipgloss.NewStyle().
+	Padding(2, 4).
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#874BFD")).
+	Background(lipgloss.Color("#1a1a2e"))
 
 func main() {
 	m := model{
@@ -70,17 +93,28 @@ func (m *model) Init() tea.Cmd { return nil }
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
 		m.flexBox.SetWidth(msg.Width)
 		m.flexBox.SetHeight(msg.Height)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
+		case "a":
+			m.showAbout = !m.showAbout
 		}
-
 	}
 	return m, nil
 }
+
 func (m *model) View() string {
-	return m.flexBox.Render()
+	content := m.flexBox.Render()
+	if m.showAbout {
+		overlay := aboutStyle.Render(aboutText)
+		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay,
+			lipgloss.WithWhitespaceChars(" "),
+			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+	}
+	return content
 }
