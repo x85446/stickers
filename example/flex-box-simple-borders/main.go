@@ -42,6 +42,14 @@ var borderNames = []string{
 	"Hidden Border",
 }
 
+// Cell labels
+var cellLabels = []string{
+	"A", "B", "C",
+	"D", "E", "F", "G", "H", "I", "J",
+	"K", "L", "M", "N", "O",
+	"P", "Q", "R", "S", "T",
+}
+
 func main() {
 	m := model{
 		flexBox:     flexbox.New(0, 0),
@@ -54,44 +62,83 @@ func main() {
 		},
 	}
 
-	rows := []*flexbox.Row{
-		m.flexBox.NewRow().AddCells(
-			flexbox.NewCell(1, 6),
-			flexbox.NewCell(1, 6),
-			flexbox.NewCell(1, 6),
-		),
-		m.flexBox.NewRow().AddCells(
-			flexbox.NewCell(2, 4),
-			flexbox.NewCell(2, 4),
-			flexbox.NewCell(3, 4),
-			flexbox.NewCell(3, 4),
-			flexbox.NewCell(3, 4),
-			flexbox.NewCell(4, 4),
-			flexbox.NewCell(4, 4),
-		),
-		m.flexBox.NewRow().AddCells(
-			flexbox.NewCell(2, 5),
-			flexbox.NewCell(3, 5),
-			flexbox.NewCell(10, 5).SetContentGenerator(func(w, h int) string {
-				return lipgloss.NewStyle().
-					Width(w).
-					Height(h).
-					Align(lipgloss.Center, lipgloss.Center).
-					Render(borderNames[m.borderType] + " (t)")
-			}),
-			flexbox.NewCell(3, 5),
-			flexbox.NewCell(2, 5),
-		),
-		m.flexBox.NewRow().AddCells(
-			flexbox.NewCell(1, 4),
-			flexbox.NewCell(1, 3),
-			flexbox.NewCell(1, 2),
-			flexbox.NewCell(1, 3),
-			flexbox.NewCell(1, 4),
-		),
+	// Row 1: 3 cells [1:6]
+	row1 := m.flexBox.NewRow()
+	row1Ratios := [][]int{{1, 6}, {1, 6}, {1, 6}}
+	for i, r := range row1Ratios {
+		idx := i
+		ratioX, ratioY := r[0], r[1]
+		cell := flexbox.NewCell(ratioX, ratioY)
+		cell.SetContentGenerator(func(w, h int) string {
+			return lipgloss.NewStyle().
+				Width(w).Height(h).
+				Align(lipgloss.Center, lipgloss.Center).
+				Render(fmt.Sprintf("%s\n[%d:%d]", cellLabels[idx], ratioX, ratioY))
+		})
+		row1.AddCells(cell)
 	}
 
-	m.flexBox.AddRows(rows)
+	// Row 2: 7 cells with varying ratios
+	row2 := m.flexBox.NewRow()
+	row2Ratios := [][]int{{2, 4}, {2, 4}, {3, 4}, {3, 4}, {3, 4}, {4, 4}, {4, 4}}
+	for i, r := range row2Ratios {
+		idx := 3 + i
+		ratioX, ratioY := r[0], r[1]
+		cell := flexbox.NewCell(ratioX, ratioY)
+		cell.SetContentGenerator(func(w, h int) string {
+			return lipgloss.NewStyle().
+				Width(w).Height(h).
+				Align(lipgloss.Center, lipgloss.Center).
+				Render(fmt.Sprintf("%s\n[%d:%d]", cellLabels[idx], ratioX, ratioY))
+		})
+		row2.AddCells(cell)
+	}
+
+	// Row 3: 5 cells, center shows border name
+	row3 := m.flexBox.NewRow()
+	row3Ratios := [][]int{{2, 5}, {3, 5}, {10, 5}, {3, 5}, {2, 5}}
+	for i, r := range row3Ratios {
+		idx := 10 + i
+		ratioX, ratioY := r[0], r[1]
+		cell := flexbox.NewCell(ratioX, ratioY)
+		if i == 2 {
+			// Center cell shows border name
+			cell.SetContentGenerator(func(w, h int) string {
+				return lipgloss.NewStyle().
+					Width(w).Height(h).
+					Align(lipgloss.Center, lipgloss.Center).
+					Render(fmt.Sprintf("%s (t)\n[%d:%d]", borderNames[m.borderType], ratioX, ratioY))
+			})
+		} else {
+			cell.SetContentGenerator(func(w, h int) string {
+				return lipgloss.NewStyle().
+					Width(w).Height(h).
+					Align(lipgloss.Center, lipgloss.Center).
+					Render(fmt.Sprintf("%s\n[%d:%d]", cellLabels[idx], ratioX, ratioY))
+			})
+		}
+		row3.AddCells(cell)
+	}
+
+	// Row 4: 5 cells with varying height ratios
+	row4 := m.flexBox.NewRow()
+	row4Ratios := [][]int{{1, 4}, {1, 3}, {1, 2}, {1, 3}, {1, 4}}
+	for i, r := range row4Ratios {
+		idx := 15 + i
+		ratioX, ratioY := r[0], r[1]
+		cell := flexbox.NewCell(ratioX, ratioY)
+		if idx != 17 { // Skip content for cell R (too small for text + border)
+			cell.SetContentGenerator(func(w, h int) string {
+				return lipgloss.NewStyle().
+					Width(w).Height(h).
+					Align(lipgloss.Center, lipgloss.Center).
+					Render(fmt.Sprintf("%s\n[%d:%d]", cellLabels[idx], ratioX, ratioY))
+			})
+		}
+		row4.AddCells(cell)
+	}
+
+	m.flexBox.AddRows([]*flexbox.Row{row1, row2, row3, row4})
 	m.updateStyles()
 
 	p := tea.NewProgram(&m, tea.WithAltScreen())

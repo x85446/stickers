@@ -9,7 +9,6 @@ vendor/
 .warden
 
 # Demo binaries
-main
 flex-box-simple
 flex-box-horizonal
 flex-box-nested-borders
