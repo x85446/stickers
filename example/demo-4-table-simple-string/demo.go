@@ -1,7 +1,9 @@
-package main
+package demo4
 
 import (
+	"encoding/csv"
 	"fmt"
+	"log"
 	"os"
 	"unicode"
 
@@ -9,12 +11,12 @@ import (
 	"github.com/x85446/stickers/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
-	"github.com/gocarina/gocsv"
 )
 
 var selectedValue string = "\nselect something with spacebar or enter"
 
-type model struct {
+// Model is the Bubble Tea model for demo 4
+type Model struct {
 	table     *table.Table
 	infoBox   *flexbox.FlexBox
 	headers   []string
@@ -23,76 +25,66 @@ type model struct {
 	height    int
 }
 
-const aboutText = `Demo 5: Table Multi-Type
+const aboutText = `Demo 4: Table Simple String
 
-Table with typed columns for proper sorting.
+Navigable table with sorting and filtering.
 
-Unlike demo-4 (string-only), this demo uses gocsv
-to parse CSV data with typed columns (int, string).
-
-This enables proper numeric sorting: integers sort
-numerically (1, 2, 10) instead of lexically (1, 10, 2).
+Demonstrates the Table component with string data
+loaded from a CSV file.
 
 Navigation:
 - Arrow keys: Move cursor
-- Ctrl+S: Sort by column (numeric or alpha)
+- Ctrl+S: Sort by current column (toggle asc/desc)
 - Enter/Space: Select cell value
-- Type to filter
+- Type letters/numbers: Filter current column
+- Backspace: Clear filter character
 
 Press 'a' to close | 'q' to quit`
 
-func main() {
-	// read in CSV data
-	f, err := os.Open("../sample.csv")
+// New creates a new demo 4 model
+func New() *Model {
+	// read in CSV data - try multiple paths for flexibility
+	csvPath := "../sample.csv"
+	f, err := os.Open(csvPath)
 	if err != nil {
-		panic(err)
+		// Try path from example/ directory (for demo-all)
+		csvPath = "sample.csv"
+		f, err = os.Open(csvPath)
+		if err != nil {
+			panic(err)
+		}
 	}
 	defer f.Close()
 
-	type SampleData struct {
-		ID         int    `csv:"id"`
-		FirstName  string `csv:"First Name"`
-		LastName   string `csv:"Last Name"`
-		Age        int    `csv:"Age"`
-		Occupation string `csv:"Occupation"`
-	}
-	var sampleData []*SampleData
-
-	if err := gocsv.UnmarshalFile(f, &sampleData); err != nil {
-		panic(err)
+	csvReader := csv.NewReader(f)
+	data, err := csvReader.ReadAll()
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	headers := []string{"id", "First Name", "Last Name", "Age", "Occupation"}
+	headers := data[0]
+	rows := make([][]any, len(data[1:]))
+	for i, row := range data[1:] {
+		rows[i] = make([]any, len(headers))
+		for j, cell := range row {
+			rows[i][j] = cell
+		}
+	}
 	ratio := []int{1, 10, 10, 5, 10}
 	minSize := []int{4, 5, 5, 2, 5}
 
-	var s string
-	var i int
-	types := []any{i, s, s, i, s}
-
-	m := model{
+	m := &Model{
 		table:   table.NewTable(0, 0, headers),
 		infoBox: flexbox.New(0, 0).SetHeight(7),
 		headers: headers,
 	}
-	// set types
-	_, err = m.table.SetTypes(types...)
-	if err != nil {
+	m.table.SetStylePassing(true)
+	// setup
+	m.table.SetRatio(ratio).SetMinWidth(minSize)
+	// add rows
+	if _, err := m.table.AddRows(rows); err != nil {
 		panic(err)
 	}
-	// setup dimensions
-	m.table.SetRatio(ratio).SetMinWidth(minSize)
-	// set style passing
-	m.table.SetStylePassing(true)
-	// add rows
-	// with multi type table we have to convert our rows to []any first which is a bit of a pain
-	var orderedRows [][]any
-	for _, row := range sampleData {
-		orderedRows = append(orderedRows, []any{
-			row.ID, row.FirstName, row.LastName, row.Age, row.Occupation,
-		})
-	}
-	m.table.MustAddRows(orderedRows)
 
 	// setup info box
 	infoText := `
@@ -114,16 +106,24 @@ ctrl+c: quit
 	)
 	m.infoBox.AddRows([]*flexbox.Row{r1})
 
-	p := tea.NewProgram(&m, tea.WithAltScreen())
+	return m
+}
+
+// Run starts the demo as a standalone program
+func Run() {
+	m := New()
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	if err := p.Start(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
 }
 
-func (m *model) Init() tea.Cmd { return nil }
+// Init implements tea.Model
+func (m *Model) Init() tea.Cmd { return nil }
 
-func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update implements tea.Model
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -173,7 +173,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *model) filterWithStr(key string) {
+func (m *Model) filterWithStr(key string) {
 	i, s := m.table.GetFilter()
 	x, _ := m.table.GetCursorLocation()
 	if x != i && key != "backspace" {
@@ -201,7 +201,8 @@ var aboutStyle = lipgloss.NewStyle().
 	BorderForeground(lipgloss.Color("#874BFD")).
 	Background(lipgloss.Color("#1a1a2e"))
 
-func (m *model) View() string {
+// View implements tea.Model
+func (m *Model) View() string {
 	content := lipgloss.JoinVertical(lipgloss.Left, m.table.Render(), m.infoBox.Render())
 	if m.showAbout {
 		overlay := aboutStyle.Render(aboutText)

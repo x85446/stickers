@@ -1,7 +1,10 @@
-.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 demo-10 demo-10-log demo-11 demo-12 log log-follow help clean
+.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 demo-10 demo-10-log demo-11 demo-12 demo-all log log-follow help clean
 
 help:
 	@echo "Available demos (press 'q' or Ctrl+C to exit):"
+	@echo ""
+	@echo "  make demo-all - All Demos Combined"
+	@echo "                 Cycle through all demos with [tab] next, [shift+tab] prev"
 	@echo ""
 	@echo "Original stickers demos:"
 	@echo "  make demo-1  - FlexBox Simple"
@@ -49,45 +52,48 @@ help:
 	@echo "Utilities:"
 	@echo "  make clean       - Remove log files and build artifacts"
 
+demo-all:
+	@cd example && go run ./demo-all
+
 demo-1:
-	@go run ./example/demo-1-flex-box-simple/main.go
+	@go run ./example/demo-1-flex-box-simple/cmd
 
 demo-2:
-	@go run ./example/demo-2-flex-box-horizonal/main.go
+	@go run ./example/demo-2-flex-box-horizonal/cmd
 
 demo-3:
-	@cd example/demo-3-flex-box-with-table && go run main.go
+	@cd example/demo-3-flex-box-with-table && go run ./cmd
 
 demo-4:
-	@cd example/demo-4-table-simple-string && go run main.go
+	@cd example/demo-4-table-simple-string && go run ./cmd
 
 demo-5:
-	@cd example/demo-5-table-multi-type && go run main.go
+	@cd example/demo-5-table-multi-type && go run ./cmd
 
 demo-6:
-	@go run ./example/demo-6-flex-box-nested-borders/main.go
+	@go run ./example/demo-6-flex-box-nested-borders/cmd
 
 demo-7:
-	@go run ./example/demo-7-flex-box-simple-borders/main.go
+	@go run ./example/demo-7-flex-box-simple-borders/cmd
 
 demo-8:
-	@go run ./example/demo-8-flex-box-fixed-rows/main.go
+	@go run ./example/demo-8-flex-box-fixed-rows/cmd
 
 demo-9:
-	@go run ./example/demo-9-flex-box-fixed-width/main.go
+	@go run ./example/demo-9-flex-box-fixed-width/cmd
 
 demo-10:
-	@go run ./example/demo-10-flex-box-mixed-fixed/main.go
+	@go run ./example/demo-10-flex-box-mixed-fixed/cmd
 
 demo-10-log:
 	@echo "Starting demo-10 with logging to demo10_size_log.txt..."
 	@go run ./example/demo-10-flex-box-mixed-fixed/main_with_log.go
 
 demo-11:
-	@go run ./example/demo-11-flex-box-cell-config/main.go
+	@go run ./example/demo-11-flex-box-cell-config/cmd
 
 demo-12:
-	@go run ./example/demo-12-flex-box-row-align/main.go
+	@go run ./example/demo-12-flex-box-row-align/cmd
 
 log:
 	@if [ -f demo10_size_log.txt ]; then \

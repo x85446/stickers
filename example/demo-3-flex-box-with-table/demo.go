@@ -1,4 +1,4 @@
-package main
+package demo3
 
 import (
 	"encoding/csv"
@@ -30,7 +30,8 @@ var (
 	tableCellIndex = 1
 )
 
-type model struct {
+// Model is the Bubble Tea model for demo 3
+type Model struct {
 	flexBox   *flexbox.FlexBox
 	table     *table.Table
 	headers   []string
@@ -55,11 +56,18 @@ Navigation:
 
 Press 'a' to close | 'q' to quit`
 
-func main() {
-	// read in CSV data
-	f, err := os.Open("../sample.csv")
+// New creates a new demo 3 model
+func New() *Model {
+	// read in CSV data - try multiple paths for flexibility
+	csvPath := "../sample.csv"
+	f, err := os.Open(csvPath)
 	if err != nil {
-		panic(err)
+		// Try path from example/ directory (for demo-all)
+		csvPath = "sample.csv"
+		f, err = os.Open(csvPath)
+		if err != nil {
+			panic(err)
+		}
 	}
 	defer f.Close()
 
@@ -80,7 +88,7 @@ func main() {
 	ratio := []int{1, 10, 10, 5, 10}
 	minSize := []int{4, 5, 5, 2, 5}
 
-	m := model{
+	m := &Model{
 		flexBox: flexbox.New(0, 0).SetStyle(styleBackground),
 		table:   table.NewTable(0, 0, headers),
 		headers: headers,
@@ -113,16 +121,24 @@ func main() {
 	_rows := []*flexbox.Row{r1, r2, r3}
 	m.flexBox.AddRows(_rows)
 
-	p := tea.NewProgram(&m, tea.WithAltScreen())
+	return m
+}
+
+// Run starts the demo as a standalone program
+func Run() {
+	m := New()
+	p := tea.NewProgram(m, tea.WithAltScreen())
 	if err := p.Start(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
 }
 
-func (m *model) Init() tea.Cmd { return nil }
+// Init implements tea.Model
+func (m *Model) Init() tea.Cmd { return nil }
 
-func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+// Update implements tea.Model
+func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		windowHeight := msg.Height
@@ -191,7 +207,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m *model) filterWithStr(key string) {
+func (m *Model) filterWithStr(key string) {
 	i, s := m.table.GetFilter()
 	x, _ := m.table.GetCursorLocation()
 	if x != i && key != "backspace" {
@@ -219,7 +235,8 @@ var aboutStyle = lipgloss.NewStyle().
 	BorderForeground(lipgloss.Color("#874BFD")).
 	Background(lipgloss.Color("#1a1a2e"))
 
-func (m *model) View() string {
+// View implements tea.Model
+func (m *Model) View() string {
 	m.flexBox.ForceRecalculate()
 	_r := m.flexBox.GetRow(tableRowIndex)
 	if _r == nil {
