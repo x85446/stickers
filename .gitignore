@@ -23,3 +23,6 @@ demo10_size_log.txt
 tmp
 cmd
 demo-all
+
+# direnv badge, per-machine
+.envrc
