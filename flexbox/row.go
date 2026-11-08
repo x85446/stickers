@@ -152,18 +152,11 @@ func (r *Row) render(inherited ...lipgloss.Style) string {
 	for _, cell := range r.cells {
 		renderedCells = append(renderedCells, cell.render(inheritedStyle...))
 	}
-	joined := lipgloss.JoinHorizontal(lipgloss.Top, renderedCells...)
-
-	// Check if row content is narrower than allocated width (e.g., fixed-width cells)
-	// If so, don't force full width - let JoinVertical handle alignment
-	actualWidth := lipgloss.Width(joined)
-	if actualWidth < r.getMaxWidth() {
-		return r.style.
-			Height(r.getContentHeight()).MaxHeight(r.getMaxHeight()).
-			Render(joined)
-	}
+	// The cells are laid out already: anything wider than the row, such as a fixed-width
+	// cell wider than the box, is clipped at the row's edge, never wrapped. A row narrower
+	// than the box keeps its width so the box can align it.
+	joined := clipWidth(lipgloss.JoinHorizontal(lipgloss.Top, renderedCells...), r.getContentWidth())
 	return r.style.
-		Width(r.getContentWidth()).MaxWidth(r.getMaxWidth()).
 		Height(r.getContentHeight()).MaxHeight(r.getMaxHeight()).
 		Render(joined)
 }

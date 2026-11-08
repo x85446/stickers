@@ -56,6 +56,11 @@ func TestCellRenderZeroHeightHoldsWidth(t *testing.T) {
 	assertLines(t, renderAt(cell, 5, 0), "     ")
 }
 
+func TestCellRenderZeroWidthHoldsHeight(t *testing.T) {
+	cell := NewCell(1, 1).SetStyle(bordered()).SetContent("ab")
+	assertLines(t, renderAt(cell, 0, 3), "", "", "")
+}
+
 func TestCellRenderClipsWrappedContent(t *testing.T) {
 	cell := NewCell(1, 1).SetStyle(bordered()).SetContent("aaaa bbbb cccc")
 	assertLines(t, renderAt(cell, 6, 4),

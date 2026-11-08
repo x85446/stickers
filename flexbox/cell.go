@@ -166,7 +166,8 @@ func (r *Cell) GetHeight() int {
 // The frame (margins and border) renders complete whenever the cell has room for it:
 // the content is wrapped the way lipgloss wraps it and clipped to the lines left between
 // the paddings, so content taller than the cell loses its bottom lines, never the border.
-// A cell with no lines renders as one blank line of its width so a row keeps its columns.
+// A cell with no lines renders as one blank line of its width so a row keeps its columns,
+// and a cell with no columns renders as empty lines so a column keeps its rows.
 func (r *Cell) render(inherited ...lipgloss.Style) string {
 	for _, style := range inherited {
 		r.style = r.style.Inherit(style)
@@ -174,6 +175,10 @@ func (r *Cell) render(inherited ...lipgloss.Style) string {
 
 	if r.getMaxHeight() <= 0 {
 		return strings.Repeat(" ", max(r.getMaxWidth(), 0))
+	}
+	if r.getMaxWidth() <= 0 {
+		// no columns: hold the lines so a column keeps its rows and add nothing to a row
+		return strings.Repeat("\n", r.getMaxHeight()-1)
 	}
 
 	s := r.GetStyle().
