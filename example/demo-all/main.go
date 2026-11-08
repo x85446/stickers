@@ -21,20 +21,30 @@ import (
 	demo9 "github.com/x85446/stickers/example/demo-9-flex-box-fixed-width"
 )
 
-// sharedKeys are the keys every demo answers to, in the order the header shows them.
+// sharedKeys are the keys every demo answers to. The header shows them last, after the
+// demo's own keys, so a narrow terminal cuts them before anything specific to the demo.
 const sharedKeys = "[a]bout [tab] next [shift+tab] prev [q] quit"
 
 type demoInfo struct {
 	name string
-	keys string // the demo's own keys, listed after the shared ones
+	keys string // the demo's own keys, shown right after its name
+}
+
+// headerText is the full header line for a demo before any cut for the terminal width.
+func headerText(info demoInfo) string {
+	text := "Demo " + info.name
+	if info.keys != "" {
+		text += " | " + info.keys
+	}
+	return text + " | " + sharedKeys
 }
 
 var demoInfos = []demoInfo{
 	{"1: FlexBox Simple", ""},
 	{"2: FlexBox Horizontal", ""},
-	{"3: FlexBox with Table", "[arrows] move [ctrl+s] sort [enter] copy cell [letters] filter"},
-	{"4: Table Simple String", "[arrows] move [ctrl+s] sort [enter] select [letters] filter"},
-	{"5: Table Multi-Type", "[arrows] move [ctrl+s] sort [enter] select [letters] filter"},
+	{"3: FlexBox with Table", "[arrows] [ctrl+s] sort [enter] copy [a-z] filter"},
+	{"4: Table Simple String", "[arrows] [ctrl+s] sort [enter] select [a-z] filter"},
+	{"5: Table Multi-Type", "[arrows] [ctrl+s] sort [enter] select [a-z] filter"},
 	{"6: Nested Borders", "[b] border"},
 	{"7: Simple Borders", "[b] border"},
 	{"8: Fixed Row Heights", "[m] fixed/dynamic heights"},
@@ -205,12 +215,8 @@ func (m *model) View() string {
 		return m.viewSplash()
 	}
 
-	info := demoInfos[m.current]
-	text := fmt.Sprintf("Demo %s | %s", info.name, sharedKeys)
-	if info.keys != "" {
-		text += " | " + info.keys
-	}
-	// the header is one line: a narrow terminal cuts the demo's own keys, never wraps them
+	text := headerText(demoInfos[m.current])
+	// the header is one line: a narrow terminal cuts its tail, never wraps it
 	if m.width > 0 {
 		text = ansi.Truncate(text, m.width, "…")
 	}
