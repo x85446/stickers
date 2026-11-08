@@ -1,6 +1,7 @@
 package main
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -68,5 +69,50 @@ func TestSplashQuit(t *testing.T) {
 		if _, ok := cmd().(tea.QuitMsg); !ok {
 			t.Fatalf("%s on splash did not quit", k.String())
 		}
+	}
+}
+
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
+
+// TestEveryDemoFitsUnderHeader: the header plus the demo never exceed the terminal, the
+// header is one line that starts with the demo's name and own keys, carries the shared
+// keys whenever it fits, and a resize while running keeps all of that true.
+func TestEveryDemoFitsUnderHeader(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 40}, {160, 40}} {
+		m := newModel()
+		m = press(t, m, tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+		m = press(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+		for i := range m.demos {
+			checkFits(t, m, size[0], size[1])
+			if i < len(m.demos)-1 {
+				m = press(t, m, key(tea.KeyTab))
+			}
+		}
+		m = press(t, m, tea.WindowSizeMsg{Width: size[0] - 10, Height: size[1] - 4})
+		checkFits(t, m, size[0]-10, size[1]-4)
+	}
+}
+
+func checkFits(t *testing.T, m *model, width, height int) {
+	t.Helper()
+	info := demoInfos[m.current]
+	lines := strings.Split(m.View(), "\n")
+	if len(lines) > height {
+		t.Errorf("%s at %dx%d renders %d lines", info.name, width, height, len(lines))
+	}
+	header := strings.TrimSpace(ansiRe.ReplaceAllString(lines[0], ""))
+	if w := len([]rune(header)); w > width {
+		t.Errorf("%s header is %d columns wide at %d", info.name, w, width)
+	}
+	lead := "Demo " + info.name
+	if info.keys != "" {
+		lead += " | " + info.keys
+	}
+	full := headerText(info)
+	switch {
+	case len([]rune(full)) <= width && header != full:
+		t.Errorf("%s header at %d columns is %q, want %q", info.name, width, header, full)
+	case len([]rune(full)) > width && !strings.HasPrefix(header, lead[:min(len(lead), width-1)]):
+		t.Errorf("%s header at %d columns lost its own keys: %q", info.name, width, header)
 	}
 }

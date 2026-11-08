@@ -155,7 +155,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.termWidth = msg.Width
 		m.termHeight = msg.Height
 		m.flexBox.SetWidth(msg.Width)
-		m.flexBox.SetHeight(msg.Height)
+		m.flexBox.SetHeight(msg.Height - 1) // the status line takes the first row
 		m.rebuildFlexBox()
 	case tea.KeyMsg:
 		switch m.configMode {
