@@ -38,7 +38,8 @@
 // its width in a row and takes no room in a column; a cell with zero columns adds
 // nothing to a row. A row never wraps its cells: anything wider than the row is cut at
 // the row's edge, and a row narrower than the box keeps its width so SetRowAlign can
-// place it.
+// place it. Columns that together are narrower than a HorizontalFlexBox are placed by
+// SetColumnAlign.
 //
 // # Styles
 //

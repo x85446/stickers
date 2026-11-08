@@ -99,7 +99,7 @@ func (r *HorizontalFlexBox) SetColumns(columns []*Column) *HorizontalFlexBox {
 	return r
 }
 
-// ColumnsLen returns the len of the columns slice
+// ColumnsLen returns the number of columns.
 func (r *HorizontalFlexBox) ColumnsLen() int {
 	return len(r.columns)
 }
@@ -150,7 +150,7 @@ func (r *HorizontalFlexBox) LockColumnWidth(value int) *HorizontalFlexBox {
 	return r
 }
 
-// SetHeight sets the FlexBox height
+// SetHeight sets the box height, which every column gets in full.
 func (r *HorizontalFlexBox) SetHeight(value int) *HorizontalFlexBox {
 	r.height = value
 	for _, column := range r.columns {
@@ -159,19 +159,19 @@ func (r *HorizontalFlexBox) SetHeight(value int) *HorizontalFlexBox {
 	return r
 }
 
-// SetWidth sets the FlexBox width
+// SetWidth sets the box width, the columns its columns share.
 func (r *HorizontalFlexBox) SetWidth(value int) *HorizontalFlexBox {
 	r.width = value
 	r.setRecalculate()
 	return r
 }
 
-// GetHeight yields current FlexBox height
+// GetHeight returns the box height.
 func (r *HorizontalFlexBox) GetHeight() int {
 	return r.getMaxHeight()
 }
 
-// GetWidth yields current FlexBox width
+// GetWidth returns the box width.
 func (r *HorizontalFlexBox) GetWidth() int {
 	return r.getMaxWidth()
 }

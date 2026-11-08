@@ -2,7 +2,7 @@
 vendor/
 .vscode
 
-# Demo binaries built at the repo root (go build ./...)
+# Demo binaries built at the repo root with go build
 /main
 /cmd
 /demo-all

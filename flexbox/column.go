@@ -35,7 +35,7 @@ func (r *Column) AddCells(cells ...*Cell) *Column {
 	return r
 }
 
-// CellsLen returns the len of the cells slice
+// CellsLen returns the number of cells.
 func (r *Column) CellsLen() int {
 	return len(r.cells)
 }

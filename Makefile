@@ -36,7 +36,7 @@ help:
 	@echo "                 Fixed vs dynamic column widths (m)"
 	@echo ""
 	@echo "  make demo-10 - FlexBox Mixed Fixed Layout"
-	@echo "                 Combines fixed widths/heights with ratio-based cells (t, f, h)"
+	@echo "                 Combines fixed widths/heights with ratio-based cells (b, m, h)"
 	@echo ""
 	@echo "  make demo-11 - FlexBox Interactive Cell Config"
 	@echo "                 Configure individual cells interactively (C-W skip H, w, h, b, ESC)"

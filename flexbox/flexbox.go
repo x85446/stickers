@@ -98,7 +98,7 @@ func (r *FlexBox) SetRows(rows []*Row) *FlexBox {
 	return r
 }
 
-// RowsLen returns the len of the rows slice
+// RowsLen returns the number of rows.
 func (r *FlexBox) RowsLen() int {
 	return len(r.rows)
 }
@@ -148,14 +148,14 @@ func (r *FlexBox) LockRowHeight(value int) *FlexBox {
 	return r
 }
 
-// SetHeight sets the FlexBox height
+// SetHeight sets the box height, the lines its rows share.
 func (r *FlexBox) SetHeight(value int) *FlexBox {
 	r.height = value
 	r.setRecalculate()
 	return r
 }
 
-// SetWidth sets the FlexBox width
+// SetWidth sets the box width, the columns its rows share.
 func (r *FlexBox) SetWidth(value int) *FlexBox {
 	r.width = value
 	for _, row := range r.rows {
@@ -164,12 +164,12 @@ func (r *FlexBox) SetWidth(value int) *FlexBox {
 	return r
 }
 
-// GetHeight yields current FlexBox height
+// GetHeight returns the box height.
 func (r *FlexBox) GetHeight() int {
 	return r.getMaxHeight()
 }
 
-// GetWidth yields current FlexBox width
+// GetWidth returns the box width.
 func (r *FlexBox) GetWidth() int {
 	return r.getMaxWidth()
 }
