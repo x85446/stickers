@@ -31,6 +31,14 @@ func TestCellRenderFitsContent(t *testing.T) {
 		"└────┘")
 }
 
+func TestCellRenderKeepsTrailingSpacesOnLastLine(t *testing.T) {
+	// Both lines are 4 columns wide; centered in 10 columns they start at column 3.
+	cell := NewCell(1, 1).SetStyle(lipgloss.NewStyle().Align(lipgloss.Center)).SetContent("a   \nb   ")
+	assertLines(t, renderAt(cell, 10, 2),
+		"   a      ",
+		"   b      ")
+}
+
 func TestCellRenderClipsContentNotBorder(t *testing.T) {
 	cell := NewCell(1, 1).SetStyle(bordered()).SetContent("ab\ncd")
 	assertLines(t, renderAt(cell, 6, 3),

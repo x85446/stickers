@@ -3,6 +3,7 @@
 All notable changes to this project will be documented in this file.
 ## Unreleased
 ### Fixes
+- A cell keeps the trailing spaces of its last content line, so a centered or right-aligned block of lines keeps every line at the same offset. `ansi.Wrap`, in the cell and again inside lipgloss, drops spaces at the end of its input.
 - A cell's border and margins always render complete when the cell has room for them. Content taller than the cell is clipped to the content area instead of pushing the bottom border out of the cell; a cell with zero lines renders as a blank line of its width in a row and takes no room in a column.
 - A row clips cells that stick out past its edge, such as a fixed-width cell wider than the box, instead of word-wrapping them onto extra lines. A cell with zero width adds no columns to its row.
 - `OrderByAsc` sorts smallest first and `OrderByDesc` largest first; the two were swapped.
