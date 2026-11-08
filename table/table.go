@@ -233,7 +233,7 @@ func (r *Table) SetHeight(value int) *Table {
 	return r
 }
 
-// SetWidth sets the width of the table
+// SetWidth sets the width of the table and recomputes which columns are visible.
 func (r *Table) SetWidth(value int) *Table {
 	r.width = value
 	r.rowsBox.SetWidth(value)
@@ -346,8 +346,8 @@ func (r *Table) CursorRight() *Table {
 	return r
 }
 
-// GetCursorLocation returns the cursor's column and row, both counted from 0 over the
-// visible, filtered rows.
+// GetCursorLocation returns the cursor's column and row, counted from 0. The row counts
+// over the filtered rows.
 func (r *Table) GetCursorLocation() (int, int) {
 	return r.cursorIndexX, r.cursorIndexY
 }

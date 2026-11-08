@@ -284,9 +284,12 @@ so run them through `make` or from inside `example`.
 go test ./...
 ```
 
-The `flexbox` package tests cover the cell and row rendering rules above.
-`example/demo-all` has a test that cycles every demo at several terminal sizes
-and checks that each fits under the header.
+The `flexbox` tests cover the cell and row rendering rules above and column
+alignment. The `table` tests cover typed sorting in both directions, style
+overrides, the height before `SetHeight`, cell sizes after horizontal
+scrolling, and the sizing checks. `example/demo-all` has a test that cycles
+every demo at several terminal sizes and checks that each fits under the
+header.
 
 ## License
 

@@ -36,11 +36,11 @@ type Cell struct {
 	contentGenerator func(maxX, maxY int) string
 }
 
-// CellOption is a functional option for configuring a Cell
+// CellOption configures a Cell as NewCell creates it.
 type CellOption func(*Cell)
 
-// WithStyle sets the initial style for the cell.
-// Width/height related keys are automatically unset.
+// WithStyle sets the cell's style, with width and height keys removed, as NewCell creates
+// it.
 func WithStyle(style lipgloss.Style) CellOption {
 	return func(c *Cell) {
 		c.style = style.
@@ -147,21 +147,19 @@ func (r *Cell) SetStyle(style lipgloss.Style) *Cell {
 	return r
 }
 
-// GetStyle returns the copy of the cells current style
+// GetStyle returns a copy of the cell's style.
 func (r *Cell) GetStyle() lipgloss.Style {
 	return r.style
 }
 
-// GetWidth returns the full allocated width of the cell including borders, padding, and margins.
-// For dimension-aware content that needs to fit within the cell's content area,
-// use SetContentGenerator() which receives content dimensions automatically.
+// GetWidth returns the width the grid gave the cell, frame included. A content generator
+// receives the content area instead.
 func (r *Cell) GetWidth() int {
 	return r.getMaxWidth()
 }
 
-// GetHeight returns the full allocated height of the cell including borders, padding, and margins.
-// For dimension-aware content that needs to fit within the cell's content area,
-// use SetContentGenerator() which receives content dimensions automatically.
+// GetHeight returns the height the grid gave the cell, frame included. A content
+// generator receives the content area instead.
 func (r *Cell) GetHeight() int {
 	return r.getMaxHeight()
 }

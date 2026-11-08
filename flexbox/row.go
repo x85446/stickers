@@ -46,7 +46,7 @@ func (r *Row) SetFixedHeight(value int) *Row {
 	return r
 }
 
-// CellsLen returns the len of the cells slice
+// CellsLen returns the number of cells.
 func (r *Row) CellsLen() int {
 	return len(r.cells)
 }
