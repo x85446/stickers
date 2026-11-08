@@ -1,0 +1,7 @@
+package main
+
+import demo9 "github.com/x85446/stickers/example/demo-9-flex-box-fixed-width"
+
+func main() {
+	demo9.Run()
+}

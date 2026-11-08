@@ -39,7 +39,7 @@ help:
 	@echo "                 Combines fixed widths/heights with ratio-based cells (t, f, h)"
 	@echo ""
 	@echo "  make demo-11 - FlexBox Interactive Cell Config"
-	@echo "                 Configure individual cells interactively (A-T, w, h, T, H, ESC)"
+	@echo "                 Configure individual cells interactively (C-W skip H, w, h, b, ESC)"
 	@echo ""
 	@echo "  make demo-12 - FlexBox Row Alignment"
 	@echo "                 Demonstrates SetRowAlign for varying row widths (a)"

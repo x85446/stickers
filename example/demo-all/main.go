@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
 	demo1 "github.com/x85446/stickers/example/demo-1-flex-box-simple"
 	demo10 "github.com/x85446/stickers/example/demo-10-flex-box-mixed-fixed"
 	demo11 "github.com/x85446/stickers/example/demo-11-flex-box-cell-config"
@@ -16,8 +18,6 @@ import (
 	demo7 "github.com/x85446/stickers/example/demo-7-flex-box-simple-borders"
 	demo8 "github.com/x85446/stickers/example/demo-8-flex-box-fixed-rows"
 	demo9 "github.com/x85446/stickers/example/demo-9-flex-box-fixed-width"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
 )
 
 type demoInfo struct {
@@ -45,10 +45,11 @@ type model struct {
 	demos   []tea.Model
 	width   int
 	height  int
+	started bool // false while the splash screen is showing
 }
 
-func main() {
-	m := &model{
+func newModel() *model {
+	return &model{
 		current: 0,
 		demos: []tea.Model{
 			demo1.New(),
@@ -65,7 +66,10 @@ func main() {
 			demo12.New(),
 		},
 	}
+}
 
+func main() {
+	m := newModel()
 	p := tea.NewProgram(m, tea.WithAltScreen())
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running demo-all: %v", err)
@@ -79,6 +83,10 @@ func (m *model) Init() tea.Cmd {
 }
 
 func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	if !m.started {
+		return m.updateSplash(msg)
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
@@ -126,12 +134,80 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// updateSplash handles messages while the splash screen is showing.
+// Any key other than q / ctrl+c starts the first demo.
+func (m *model) updateSplash(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+		return m, nil
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "q", "ctrl+c":
+			return m, tea.Quit
+		}
+		m.started = true
+		// Size the first demo now that the header takes a line
+		var cmd tea.Cmd
+		m.demos[m.current], cmd = m.demos[m.current].Update(tea.WindowSizeMsg{
+			Width:  m.width,
+			Height: m.height - 1,
+		})
+		return m, cmd
+	}
+	// Let ticks and other messages reach the demo so it is ready on start
+	var cmd tea.Cmd
+	m.demos[m.current], cmd = m.demos[m.current].Update(msg)
+	return m, cmd
+}
+
 var headerStyle = lipgloss.NewStyle().
 	Bold(true).
 	Foreground(lipgloss.Color("#ffffff")).
 	Background(lipgloss.Color("#7D56F4"))
 
+var splashTitleStyle = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("#7D56F4"))
+
+var splashKeyStyle = lipgloss.NewStyle().
+	Bold(true).
+	Foreground(lipgloss.Color("#ffffff"))
+
+var splashDimStyle = lipgloss.NewStyle().
+	Faint(true)
+
+var splashBoxStyle = lipgloss.NewStyle().
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color("#7D56F4")).
+	Padding(1, 4)
+
+// viewSplash renders the start screen with the key bindings.
+func (m *model) viewSplash() string {
+	key := func(k, desc string) string {
+		return splashKeyStyle.Render(k) + "  " + desc
+	}
+	lines := []string{
+		splashTitleStyle.Render("Stickers Demos"),
+		"",
+		key("a          ", "about the current demo"),
+		key("b          ", "toggle borders (where available)"),
+		key("tab        ", "next demo"),
+		key("shift+tab  ", "previous demo"),
+		key("q          ", "quit"),
+		"",
+		splashDimStyle.Render("press any key to start"),
+	}
+	box := splashBoxStyle.Render(lipgloss.JoinVertical(lipgloss.Left, lines...))
+	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
+}
+
 func (m *model) View() string {
+	if !m.started {
+		return m.viewSplash()
+	}
+
 	info := demoInfos[m.current]
 
 	// Build feature hints
