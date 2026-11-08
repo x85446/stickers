@@ -51,6 +51,15 @@ func (r *HorizontalFlexBox) StylePassing(value bool) *HorizontalFlexBox {
 	return r
 }
 
+// UseStyle sets the HorizontalFlexBox style and enables StylePassing in one call.
+// This is a convenience method for theme-based styling where you want
+// all child columns and cells to inherit the style.
+func (r *HorizontalFlexBox) UseStyle(style lipgloss.Style) *HorizontalFlexBox {
+	r.SetStyle(style)
+	r.StylePassing(true)
+	return r
+}
+
 // NewColumn initialize a new FlexBoxColumn with width inherited from the FlexBox
 func (r *HorizontalFlexBox) NewColumn() *Column {
 	rw := &Column{

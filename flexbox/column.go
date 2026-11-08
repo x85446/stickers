@@ -105,6 +105,15 @@ func (r *Column) StylePassing(value bool) *Column {
 	return r
 }
 
+// UseStyle sets the Column style and enables StylePassing in one call.
+// This is a convenience method for theme-based styling where you want
+// all child cells to inherit the style.
+func (r *Column) UseStyle(style lipgloss.Style) *Column {
+	r.SetStyle(style)
+	r.StylePassing(true)
+	return r
+}
+
 func (r *Column) setHeight(value int) {
 	r.height = value
 	r.setRecalculate()

@@ -35,9 +35,25 @@ type Cell struct {
 	contentGenerator func(maxX, maxY int) string
 }
 
-// NewCell initialize FlexBoxCell object with defaults
-func NewCell(ratioX, ratioY int) *Cell {
-	return &Cell{
+// CellOption is a functional option for configuring a Cell
+type CellOption func(*Cell)
+
+// WithStyle sets the initial style for the cell.
+// Width/height related keys are automatically unset.
+func WithStyle(style lipgloss.Style) CellOption {
+	return func(c *Cell) {
+		c.style = style.
+			UnsetWidth().
+			UnsetMaxWidth().
+			UnsetHeight().
+			UnsetMaxHeight()
+	}
+}
+
+// NewCell initialize FlexBoxCell object with defaults.
+// Optional CellOption parameters can be provided for configuration.
+func NewCell(ratioX, ratioY int, opts ...CellOption) *Cell {
+	c := &Cell{
 		style:    lipgloss.NewStyle(),
 		ratioX:   ratioX,
 		ratioY:   ratioY,
@@ -45,6 +61,10 @@ func NewCell(ratioX, ratioY int) *Cell {
 		width:    0,
 		height:   0,
 	}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
 }
 
 // SetID sets the cells ID

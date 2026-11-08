@@ -55,6 +55,15 @@ func (r *FlexBox) StylePassing(value bool) *FlexBox {
 	return r
 }
 
+// UseStyle sets the FlexBox style and enables StylePassing in one call.
+// This is a convenience method for theme-based styling where you want
+// all child rows and cells to inherit the style.
+func (r *FlexBox) UseStyle(style lipgloss.Style) *FlexBox {
+	r.SetStyle(style)
+	r.StylePassing(true)
+	return r
+}
+
 // SetRowAlign sets the horizontal alignment used when joining rows vertically.
 // Use lipgloss.Left, lipgloss.Center, or lipgloss.Right.
 // Default is lipgloss.Left for backwards compatibility.
