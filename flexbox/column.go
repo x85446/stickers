@@ -6,9 +6,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Column is the container for the cells, this object has the least to do with the ratio
-// of the construction as it takes all of the needed ratio information from the cell slice
-// columns are stacked horizontally.
+// Column holds the cells of one column of a HorizontalFlexBox. Its width comes from the
+// box; its cells' widths and heights come from their ratios. Columns sit side by side.
 type Column struct {
 	// style of the column
 	style         lipgloss.Style
@@ -24,8 +23,7 @@ type Column struct {
 	recalculateFlag bool
 }
 
-// AddCells appends the cells to the column
-// if the cell ID is not set it will default to the index of the cell
+// AddCells appends cells to the column. A cell without an ID gets its index as its ID.
 func (r *Column) AddCells(cells ...*Cell) *Column {
 	r.cells = append(r.cells, cells...)
 	for i, cell := range r.cells {
@@ -42,10 +40,8 @@ func (r *Column) CellsLen() int {
 	return len(r.cells)
 }
 
-// GetCell returns the Cell on the given index if it exists
-// note: forces the recalculation if found
-//
-//	returns nil if not found
+// GetCell returns the cell at the index, or nil. The column recalculates on its next
+// render.
 func (r *Column) GetCell(index int) *Cell {
 	if index >= 0 && index < len(r.cells) {
 		r.setRecalculate()
@@ -54,9 +50,8 @@ func (r *Column) GetCell(index int) *Cell {
 	return nil
 }
 
-// GetCellCopy returns a copy of the Cell on the given index, if cell
-// does not exist it will return nil. This is useful when you need to get
-// cells attribute without triggering a recalculation.
+// GetCellCopy returns a copy of the cell at the index, or nil. Reading the copy does not
+// trigger a recalculation.
 func (r *Column) GetCellCopy(index int) *Cell {
 	if index >= 0 && index < len(r.cells) {
 		c := r.cells[index].copy()
@@ -65,10 +60,8 @@ func (r *Column) GetCellCopy(index int) *Cell {
 	return nil
 }
 
-// GetCellWithID returns the cell with the given ID if existing
-// note: forces the recalculation if found
-//
-//	returns nil if not found
+// GetCellWithID returns the cell with the ID, or nil. The column recalculates on its
+// next render.
 func (r *Column) GetCellWithID(id string) *Cell {
 	for _, c := range r.cells {
 		if c.id == id {
@@ -79,8 +72,8 @@ func (r *Column) GetCellWithID(id string) *Cell {
 	return nil
 }
 
-// UpdateCellWithIndex replaces the cell on the given index if it exists
-// if its not existing no changes will apply
+// UpdateCellWithIndex replaces the cell at the index. An index out of range changes
+// nothing.
 func (r *Column) UpdateCellWithIndex(index int, cell *Cell) {
 	if index >= 0 && len(r.cells) > 0 && index < len(r.cells) {
 		r.cells[index] = cell
@@ -88,7 +81,9 @@ func (r *Column) UpdateCellWithIndex(index int, cell *Cell) {
 	}
 }
 
-// SetStyle replaces the style, it unsets width/height related keys
+// SetStyle replaces the style. Width and height keys are removed because the box owns
+// the column's size. A border, padding or margin on the column shrinks the area its
+// cells share.
 func (r *Column) SetStyle(style lipgloss.Style) *Column {
 	r.style = style.
 		UnsetWidth().
@@ -99,15 +94,14 @@ func (r *Column) SetStyle(style lipgloss.Style) *Column {
 	return r
 }
 
-// StylePassing set whether the style should be passed to the cells
+// StylePassing sets whether the column's style, including what it inherits from the
+// box, is passed to its cells.
 func (r *Column) StylePassing(value bool) *Column {
 	r.styleAncestor = value
 	return r
 }
 
-// UseStyle sets the Column style and enables StylePassing in one call.
-// This is a convenience method for theme-based styling where you want
-// all child cells to inherit the style.
+// UseStyle sets the style and enables StylePassing in one call.
 func (r *Column) UseStyle(style lipgloss.Style) *Column {
 	r.SetStyle(style)
 	r.StylePassing(true)

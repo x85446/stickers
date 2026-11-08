@@ -6,21 +6,25 @@ import (
 	"strconv"
 )
 
+// Ordered is the set of types a column can hold and sort by.
 type Ordered interface {
 	int | int8 | int32 | int16 | int64 | float32 | float64 | string
 }
 
+// SortingOrderKey is the direction of a sort.
 type SortingOrderKey int
 
+// The two sort directions.
 const (
-	SortingOrderAscending SortingOrderKey = iota
-	SortingOrderDescending
+	SortingOrderAscending  SortingOrderKey = iota // smallest first
+	SortingOrderDescending                        // largest first
 )
 
-// GetOrder returns the current order column index and phase
+// GetOrder returns the sorted column, -1 when the rows are unsorted, and the direction.
 func (r *Table) GetOrder() (int, SortingOrderKey) { return r.orderedColumnIndex, r.orderedColumnPhase }
 
-// OrderByAsc orders rows by a column with index n, in ascending order
+// OrderByAsc sorts the rows by the column at index, smallest first, comparing values of
+// the column's type. An index out of range, or fewer than two rows, changes nothing.
 func (r *Table) OrderByAsc(index int) *Table {
 	// sanity check first, we won't return errors here, simply ignore if the user sends non-existing index
 	if index < len(r.columnHeaders) && len(r.filteredRows) > 1 {
@@ -33,7 +37,8 @@ func (r *Table) OrderByAsc(index int) *Table {
 	return r
 }
 
-// OrderByDesc orders rows by a column with index n, in descending order
+// OrderByDesc sorts the rows by the column at index, largest first, comparing values of
+// the column's type. An index out of range, or fewer than two rows, changes nothing.
 func (r *Table) OrderByDesc(index int) *Table {
 	// sanity check first, we won't return errors here, simply ignore if the user sends non existing index
 	if index < len(r.columnHeaders) && len(r.filteredRows) > 1 {

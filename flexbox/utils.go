@@ -7,8 +7,9 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// TODO: explain this mess using some comments
-
+// calculateRatioWithMinimum splits distribute by the ratios in matrix like calculateRatio,
+// then gives every entry whose share falls under its minimum that minimum and splits what
+// is left among the others, one entry at a time.
 func calculateRatioWithMinimum(distribute int, matrix []int, minimumMatrix []int) (ratioDistribution []int) {
 	for range matrix {
 		ratioDistribution = append(ratioDistribution, 0)
@@ -38,6 +39,8 @@ func calculateRatioWithMinimum(distribute int, matrix []int, minimumMatrix []int
 	return ratioDistribution
 }
 
+// calculateRatio splits distribute by the ratios in matrix, rounding each share down and
+// handing the leftover one unit at a time to the entries with the largest ratios.
 func calculateRatio(distribute int, matrix []int) (ratioDistribution []int) {
 	if distribute == 0 {
 		for range matrix {
@@ -69,6 +72,10 @@ func calculateRatio(distribute int, matrix []int) (ratioDistribution []int) {
 	return ratioDistribution
 }
 
+// distributeToMatrix gives each entry floor(ratio/combinedRatio * distribute) and returns
+// what is left. With combinedRatio set to the largest ratio instead of the sum, the
+// largest entry gets the whole amount and the others a fraction of it, which is how cells
+// share a row's height.
 func distributeToMatrix(distribute int, combinedRatio int, matrix []int) (distribution []int, remainder int) {
 	remainder = distribute
 	for _, max := range matrix {
@@ -80,6 +87,8 @@ func distributeToMatrix(distribute int, combinedRatio int, matrix []int) (distri
 	return distribution, remainder
 }
 
+// calculateMatrixRatio splits distribute between the rows of matrix using each row's
+// largest ratio, which is how rows share a box's height and columns a box's width.
 func calculateMatrixRatio(distribute int, matrix [][]int) (ratioDistribution []int) {
 	// get matrix max ratio for each int in matrix slice
 	var maxRatio []int

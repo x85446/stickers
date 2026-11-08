@@ -2,7 +2,8 @@ package flexbox
 
 import "github.com/charmbracelet/lipgloss"
 
-// HorizontalFlexBox responsive box grid inspired by CSS flexbox
+// HorizontalFlexBox is a responsive grid of columns, each holding cells stacked
+// vertically. Columns sit side by side and share the box width by ratio.
 type HorizontalFlexBox struct {
 	// style to apply to the gridbox itself
 	style         lipgloss.Style
@@ -23,7 +24,8 @@ type HorizontalFlexBox struct {
 	recalculateFlag bool
 }
 
-// NewHorizontal initialize a HorizontalFlexBox object with defaults
+// NewHorizontal initializes a HorizontalFlexBox of the given size with no columns and an
+// empty style.
 func NewHorizontal(width, height int) *HorizontalFlexBox {
 	r := &HorizontalFlexBox{
 		width:            width,
@@ -35,7 +37,9 @@ func NewHorizontal(width, height int) *HorizontalFlexBox {
 	return r
 }
 
-// SetStyle replaces the style, it unsets width/height related keys
+// SetStyle replaces the style. Width and height keys are removed because the box's size
+// is set with SetWidth and SetHeight. A border, padding or margin shrinks the area the
+// columns share.
 func (r *HorizontalFlexBox) SetStyle(style lipgloss.Style) *HorizontalFlexBox {
 	r.style = style.
 		UnsetWidth().
@@ -45,22 +49,21 @@ func (r *HorizontalFlexBox) SetStyle(style lipgloss.Style) *HorizontalFlexBox {
 	return r
 }
 
-// StylePassing set whether the style should be passed to the columns
+// StylePassing sets whether the box's style is passed to its columns. A column passes it
+// on to its cells only when its own StylePassing is enabled.
 func (r *HorizontalFlexBox) StylePassing(value bool) *HorizontalFlexBox {
 	r.styleAncestor = value
 	return r
 }
 
-// UseStyle sets the HorizontalFlexBox style and enables StylePassing in one call.
-// This is a convenience method for theme-based styling where you want
-// all child columns and cells to inherit the style.
+// UseStyle sets the style and enables StylePassing in one call.
 func (r *HorizontalFlexBox) UseStyle(style lipgloss.Style) *HorizontalFlexBox {
 	r.SetStyle(style)
 	r.StylePassing(true)
 	return r
 }
 
-// NewColumn initialize a new FlexBoxColumn with width inherited from the FlexBox
+// NewColumn initializes an empty Column. Add it with AddColumns or SetColumns.
 func (r *HorizontalFlexBox) NewColumn() *Column {
 	rw := &Column{
 		cells: []*Cell{},
@@ -70,14 +73,14 @@ func (r *HorizontalFlexBox) NewColumn() *Column {
 	return rw
 }
 
-// AddColumns appends additional columns to the FlexBox
+// AddColumns appends columns to the box.
 func (r *HorizontalFlexBox) AddColumns(columns []*Column) *HorizontalFlexBox {
 	r.columns = append(r.columns, columns...)
 	r.setRecalculate()
 	return r
 }
 
-// SetColumns replace columns on the FlexBox
+// SetColumns replaces all columns of the box.
 func (r *HorizontalFlexBox) SetColumns(columns []*Column) *HorizontalFlexBox {
 	r.columns = columns
 	r.setRecalculate()
@@ -89,10 +92,8 @@ func (r *HorizontalFlexBox) ColumnsLen() int {
 	return len(r.columns)
 }
 
-// GetColumn returns the FlexBoxColumn on the given index if it exists
-// note: forces the recalculation if found
-//
-//	returns nil if not found
+// GetColumn returns the column at the index, or nil. The box recalculates on its next
+// render.
 func (r *HorizontalFlexBox) GetColumn(index int) *Column {
 	if index >= 0 && index < len(r.columns) {
 		r.setRecalculate()
@@ -101,10 +102,8 @@ func (r *HorizontalFlexBox) GetColumn(index int) *Column {
 	return nil
 }
 
-// GetColumnCopy returns a copy of the FlexBoxColumn on the given index, if column
-// does not exist it will return nil. Copied column also gets copies of the
-// cells. This is useful when you need to get columns attribute without
-// triggering a recalculation.
+// GetColumnCopy returns a copy of the column at the index, with copies of its cells, or
+// nil. Reading the copy does not trigger a recalculation.
 func (r *HorizontalFlexBox) GetColumnCopy(index int) *Column {
 	if index >= 0 && index < len(r.columns) {
 		columnCopy := r.columns[index].copy()
@@ -113,10 +112,8 @@ func (r *HorizontalFlexBox) GetColumnCopy(index int) *Column {
 	return nil
 }
 
-// GetColumnCellCopy returns a copy of the FlexBoxCell on the given index x,
-// within the given column with index y, if column or cell do not exist it will
-// return nil. This is useful when you need to get columns attribute without
-// triggering a recalculation.
+// GetColumnCellCopy returns a copy of the cell at cellIndex in the column at
+// columnIndex, or nil. Reading the copy does not trigger a recalculation.
 func (r *HorizontalFlexBox) GetColumnCellCopy(columnIndex, cellIndex int) *Cell {
 	if columnIndex >= 0 && columnIndex < len(r.columns) {
 		if cellIndex >= 0 && cellIndex < len(r.columns[columnIndex].cells) {
@@ -127,15 +124,15 @@ func (r *HorizontalFlexBox) GetColumnCellCopy(columnIndex, cellIndex int) *Cell 
 	return nil
 }
 
-// UpdateColumn replaces the FlexBoxColumn on the given index
+// UpdateColumn replaces the column at the index. The index must exist.
 func (r *HorizontalFlexBox) UpdateColumn(index int, column *Column) *HorizontalFlexBox {
 	r.columns[index] = column
 	r.setRecalculate()
 	return r
 }
 
-// LockColumnWidth sets the fixed width value for all the columns
-// this will disable horizontal scaling
+// LockColumnWidth pins every column to the given number of columns, which disables
+// horizontal scaling. A value of 0 or less restores ratio sizing.
 func (r *HorizontalFlexBox) LockColumnWidth(value int) *HorizontalFlexBox {
 	r.fixedColumnWidth = value
 	return r
@@ -167,8 +164,8 @@ func (r *HorizontalFlexBox) GetWidth() int {
 	return r.getMaxWidth()
 }
 
-// Render initiates the recalculation of the columns dimensions(width) if the recalculate flag is on,
-// and then it renders all the columns and combines them on the horizontal axis
+// Render lays out the columns if anything changed since the last render, renders each
+// column, and joins them horizontally inside the box's own style.
 func (r *HorizontalFlexBox) Render() string {
 	var inheritedStyle []lipgloss.Style
 	if r.styleAncestor {
@@ -187,7 +184,7 @@ func (r *HorizontalFlexBox) Render() string {
 		Render(lipgloss.JoinHorizontal(lipgloss.Top, renderedColumns...))
 }
 
-// ForceRecalculate forces the recalculation for the box and all the columns
+// ForceRecalculate lays out the box and every column now instead of at the next render.
 func (r *HorizontalFlexBox) ForceRecalculate() {
 	r.recalculate()
 	for _, rw := range r.columns {
