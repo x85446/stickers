@@ -1,0 +1,7 @@
+package main
+
+import demo8 "github.com/x85446/stickers/example/demo-8-flex-box-fixed-rows"
+
+func main() {
+	demo8.Run()
+}

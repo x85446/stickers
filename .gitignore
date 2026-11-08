@@ -1,28 +1,28 @@
 .idea/
 vendor/
-
 .vscode
 
-# Demo binaries
-main
-demo-1-flex-box-simple
-demo-2-flex-box-horizonal
-demo-6-flex-box-nested-borders
-demo-7-flex-box-simple-borders
-demo-8-flex-box-fixed-rows
-demo-9-flex-box-fixed-width
-demo-10-flex-box-mixed-fixed
-demo-11-flex-box-cell-config
-demo-12-flex-box-row-align
-example/demo-3-flex-box-with-table/demo-3-flex-box-with-table
-example/demo-4-table-simple-string/demo-4-table-simple-string
-example/demo-5-table-multi-type/demo-5-table-multi-type
+# Demo binaries built at the repo root (go build ./...)
+/main
+/cmd
+/demo-all
+/demo-1-flex-box-simple
+/demo-2-flex-box-horizonal
+/demo-6-flex-box-nested-borders
+/demo-7-flex-box-simple-borders
+/demo-8-flex-box-fixed-rows
+/demo-9-flex-box-fixed-width
+/demo-10-flex-box-mixed-fixed
+/demo-11-flex-box-cell-config
+/demo-12-flex-box-row-align
+/example/demo-3-flex-box-with-table/demo-3-flex-box-with-table
+/example/demo-4-table-simple-string/demo-4-table-simple-string
+/example/demo-5-table-multi-type/demo-5-table-multi-type
+/example/*/cmd/cmd
 
-# Log files
+# Log files and scratch
 demo10_size_log.txt
-tmp
-cmd
-demo-all
+/tmp/
 
 # direnv badge, per-machine
 .envrc
