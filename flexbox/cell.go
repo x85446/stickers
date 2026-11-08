@@ -194,14 +194,19 @@ func (r *Cell) render(inherited ...lipgloss.Style) string {
 }
 
 // fitContent wraps content at the width lipgloss wraps it and keeps the lines that fit
-// between the vertical paddings.
+// between the vertical paddings. Trailing spaces on the last line survive, so a
+// centered or right-aligned block keeps every line at the same offset.
 func (r *Cell) fitContent(content string) string {
 	wrapAt := r.getContentWidth() - r.style.GetHorizontalPadding()
 	lines := r.getContentHeight() - r.style.GetVerticalPadding()
 	if wrapAt <= 0 || lines <= 0 {
 		return ""
 	}
-	return clipLines(ansi.Wrap(content, wrapAt, ""), lines)
+	// ansi.Wrap, used here and again inside lipgloss, drops the spaces at the
+	// very end of its input. A newline after the last line keeps them; the
+	// empty line it adds falls inside the padding or is trimmed by fitHeight.
+	wrapped := strings.TrimSuffix(ansi.Wrap(content+"\n", wrapAt, ""), "\n")
+	return clipLines(wrapped, lines) + "\n"
 }
 
 func (r *Cell) getContentWidth() int {
