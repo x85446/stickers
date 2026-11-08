@@ -119,8 +119,10 @@ func (m *Model) rebuildFlexBox() {
 		row1.SetFixedHeight(5) // Set to 5 to fully account for borders
 	}
 
-	// Three cells: Fixed sidebar | Dynamic content | Fixed info
-	cell1 := flexbox.NewCell(1, 1).SetStyle(m.getCellStyle(0))
+	// Three cells: Fixed sidebar | Dynamic content | Fixed info.
+	// Height ratio 4 matches the other rows, so in dynamic mode the row keeps room for
+	// its border and three lines of text instead of collapsing to a single line.
+	cell1 := flexbox.NewCell(1, 4).SetStyle(m.getCellStyle(0))
 	if m.useFixed {
 		cell1.SetFixedWidth(25) // Fixed sidebar width
 	}
@@ -140,7 +142,7 @@ func (m *Model) rebuildFlexBox() {
 			Render(fmt.Sprintf("Sidebar\n%s, %s\n(%dx%d)", hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
-	cell2 := flexbox.NewCell(3, 1).SetStyle(m.getCellStyle(1))
+	cell2 := flexbox.NewCell(3, 4).SetStyle(m.getCellStyle(1))
 	cell2.SetContentGenerator(func(w, h int) string {
 		if m.hideText {
 			return lipgloss.NewStyle().Width(w).Height(h).Render("")
@@ -156,7 +158,7 @@ func (m *Model) rebuildFlexBox() {
 			Render(fmt.Sprintf("Header Area\n%s, %s\n(%dx%d)", hStatus, wStatus, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
-	cell3 := flexbox.NewCell(1, 1).SetStyle(m.getCellStyle(2))
+	cell3 := flexbox.NewCell(1, 4).SetStyle(m.getCellStyle(2))
 	if m.useFixed {
 		cell3.SetFixedWidth(20) // Fixed info panel width
 	}
