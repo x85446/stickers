@@ -1,6 +1,7 @@
 package main
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 
@@ -68,5 +69,41 @@ func TestSplashQuit(t *testing.T) {
 		if _, ok := cmd().(tea.QuitMsg); !ok {
 			t.Fatalf("%s on splash did not quit", k.String())
 		}
+	}
+}
+
+var ansiRe = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)
+
+// TestEveryDemoFitsUnderHeader: the header plus the demo never exceed the terminal, the
+// header always carries the shared keys, and a resize while running keeps both true.
+func TestEveryDemoFitsUnderHeader(t *testing.T) {
+	for _, size := range [][2]int{{80, 24}, {120, 40}} {
+		m := newModel()
+		m = press(t, m, tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+		m = press(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+		for i := range m.demos {
+			checkFits(t, m, size[0], size[1])
+			if i < len(m.demos)-1 {
+				m = press(t, m, key(tea.KeyTab))
+			}
+		}
+		m = press(t, m, tea.WindowSizeMsg{Width: size[0] - 10, Height: size[1] - 4})
+		checkFits(t, m, size[0]-10, size[1]-4)
+	}
+}
+
+func checkFits(t *testing.T, m *model, width, height int) {
+	t.Helper()
+	name := demoInfos[m.current].name
+	lines := strings.Split(m.View(), "\n")
+	if len(lines) > height {
+		t.Errorf("%s at %dx%d renders %d lines", name, width, height, len(lines))
+	}
+	header := ansiRe.ReplaceAllString(lines[0], "")
+	if !strings.Contains(header, sharedKeys) {
+		t.Errorf("%s header lacks the shared keys: %q", name, header)
+	}
+	if w := len([]rune(header)); w > width {
+		t.Errorf("%s header is %d columns wide at %d", name, w, width)
 	}
 }
