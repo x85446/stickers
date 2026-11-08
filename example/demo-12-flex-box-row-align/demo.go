@@ -36,7 +36,8 @@ alignment of the rendered rows.
 Press 'r' to cycle: Left → Center → Right
 
 Rows 6 & 7 have fixed 140-width to clearly show
-alignment changes. Other rows take full width.
+alignment changes. Narrower than that, they run off
+the right edge and are cut. Other rows take full width.
 
 Press 'a' to close | 'q' to quit`
 

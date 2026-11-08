@@ -42,7 +42,7 @@ help:
 	@echo "                 Configure individual cells interactively (C-W skip H, w, h, b, ESC)"
 	@echo ""
 	@echo "  make demo-12 - FlexBox Row Alignment"
-	@echo "                 Demonstrates SetRowAlign for varying row widths (a)"
+	@echo "                 Demonstrates SetRowAlign for varying row widths (r)"
 	@echo ""
 	@echo "Logging commands:"
 	@echo "  make demo-10-log - Run demo-10 with size logging"
