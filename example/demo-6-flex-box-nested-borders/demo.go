@@ -104,7 +104,7 @@ func createNestedFlexBox(width, height, depth, borderType int) string {
 			Height(height).
 			Align(lipgloss.Center, lipgloss.Center).
 			Foreground(lipgloss.Color("#ffffff"))
-		return style.Render(fmt.Sprintf("Depth: %d\n%s (t)", depth, borderNames[borderType]))
+		return style.Render(fmt.Sprintf("Depth: %d\n%s (b)", depth, borderNames[borderType]))
 	}
 
 	// Create a FlexBox for this level

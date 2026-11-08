@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/x85446/stickers/flexbox"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/flexbox"
 )
 
 var (
@@ -21,8 +21,8 @@ var (
 // Model is the Bubble Tea model for demo 7
 type Model struct {
 	flexBox     *flexbox.FlexBox
-	borderType  int       // 0=none, 1=normal, 2=rounded, 3=thick, 4=double, 5=hidden
-	cellIndexes [][]int   // Store cell indexes for each row
+	borderType  int     // index into borderTypes; 0 is the filled background
+	cellIndexes [][]int // Store cell indexes for each row
 	showAbout   bool
 	width       int
 	height      int
@@ -36,28 +36,29 @@ Each cell shows its label (A-T) and ratio [X:Y].
 The ratio determines relative cell size:
 - First number: width ratio within the row
 - Second number: height ratio for the row
+A cell with room for one line shows only its label.
 
 Press 'b' to cycle styles:
-Fill → Normal → Rounded → Thick → Double → Hidden
+Fill → Hidden → Normal → Rounded → Thick → Double
 
 Press 'a' to close | 'q' to quit`
 
 var borderTypes = []lipgloss.Border{
 	{}, // no border
+	lipgloss.HiddenBorder(),
 	lipgloss.NormalBorder(),
 	lipgloss.RoundedBorder(),
 	lipgloss.ThickBorder(),
 	lipgloss.DoubleBorder(),
-	lipgloss.HiddenBorder(),
 }
 
 var borderNames = []string{
 	"Filled Background",
+	"Hidden Border",
 	"Normal Border",
 	"Rounded Border",
 	"Thick Border",
 	"Double Border",
-	"Hidden Border",
 }
 
 // Cell labels
@@ -71,8 +72,8 @@ var cellLabels = []string{
 // New creates a new demo 7 model
 func New() *Model {
 	m := &Model{
-		flexBox:     flexbox.New(0, 0),
-		borderType:  1, // Start with normal border
+		flexBox:    flexbox.New(0, 0),
+		borderType: 2, // Start with normal border
 		cellIndexes: [][]int{
 			{0, 1, 2},
 			{3, 4, 5, 6, 7, 8, 9},
@@ -83,84 +84,62 @@ func New() *Model {
 
 	// Row 1: 3 cells [1:6]
 	row1 := m.flexBox.NewRow()
-	row1Ratios := [][]int{{1, 6}, {1, 6}, {1, 6}}
-	for i, r := range row1Ratios {
-		idx := i
-		ratioX, ratioY := r[0], r[1]
-		cell := flexbox.NewCell(ratioX, ratioY)
-		cell.SetContentGenerator(func(w, h int) string {
-			return lipgloss.NewStyle().
-				Width(w).Height(h).
-				Align(lipgloss.Center, lipgloss.Center).
-				Render(fmt.Sprintf("%s\n[%d:%d]", cellLabels[idx], ratioX, ratioY))
-		})
-		row1.AddCells(cell)
+	for i, r := range [][]int{{1, 6}, {1, 6}, {1, 6}} {
+		row1.AddCells(labelCell(i, r[0], r[1]))
 	}
 
-	// Row 2: 7 cells with varying ratios
+	// Row 2: 7 cells with varying width ratios
 	row2 := m.flexBox.NewRow()
-	row2Ratios := [][]int{{2, 4}, {2, 4}, {3, 4}, {3, 4}, {3, 4}, {4, 4}, {4, 4}}
-	for i, r := range row2Ratios {
-		idx := 3 + i
-		ratioX, ratioY := r[0], r[1]
-		cell := flexbox.NewCell(ratioX, ratioY)
-		cell.SetContentGenerator(func(w, h int) string {
-			return lipgloss.NewStyle().
-				Width(w).Height(h).
-				Align(lipgloss.Center, lipgloss.Center).
-				Render(fmt.Sprintf("%s\n[%d:%d]", cellLabels[idx], ratioX, ratioY))
-		})
-		row2.AddCells(cell)
+	for i, r := range [][]int{{2, 4}, {2, 4}, {3, 4}, {3, 4}, {3, 4}, {4, 4}, {4, 4}} {
+		row2.AddCells(labelCell(3+i, r[0], r[1]))
 	}
 
-	// Row 3: 5 cells, center shows border name
+	// Row 3: 5 cells, the center one names the current border style
 	row3 := m.flexBox.NewRow()
-	row3Ratios := [][]int{{2, 5}, {3, 5}, {10, 5}, {3, 5}, {2, 5}}
-	for i, r := range row3Ratios {
-		idx := 10 + i
-		ratioX, ratioY := r[0], r[1]
-		cell := flexbox.NewCell(ratioX, ratioY)
+	for i, r := range [][]int{{2, 5}, {3, 5}, {10, 5}, {3, 5}, {2, 5}} {
+		cell := labelCell(10+i, r[0], r[1])
 		if i == 2 {
-			// Center cell shows border name
+			ratioX, ratioY := r[0], r[1]
 			cell.SetContentGenerator(func(w, h int) string {
-				return lipgloss.NewStyle().
-					Width(w).Height(h).
-					Align(lipgloss.Center, lipgloss.Center).
-					Render(fmt.Sprintf("%s (t)\n[%d:%d]", borderNames[m.borderType], ratioX, ratioY))
-			})
-		} else {
-			cell.SetContentGenerator(func(w, h int) string {
-				return lipgloss.NewStyle().
-					Width(w).Height(h).
-					Align(lipgloss.Center, lipgloss.Center).
-					Render(fmt.Sprintf("%s\n[%d:%d]", cellLabels[idx], ratioX, ratioY))
+				return cellContent(borderNames[m.borderType]+" (b)", ratioX, ratioY, w, h)
 			})
 		}
 		row3.AddCells(cell)
 	}
 
-	// Row 4: 5 cells with varying height ratios
+	// Row 4: 5 cells with varying height ratios; the shorter cells get fewer lines
 	row4 := m.flexBox.NewRow()
-	row4Ratios := [][]int{{1, 4}, {1, 3}, {1, 2}, {1, 3}, {1, 4}}
-	for i, r := range row4Ratios {
-		idx := 15 + i
-		ratioX, ratioY := r[0], r[1]
-		cell := flexbox.NewCell(ratioX, ratioY)
-		if idx != 17 { // Skip content for cell R (too small for text + border)
-			cell.SetContentGenerator(func(w, h int) string {
-				return lipgloss.NewStyle().
-					Width(w).Height(h).
-					Align(lipgloss.Center, lipgloss.Center).
-					Render(fmt.Sprintf("%s\n[%d:%d]", cellLabels[idx], ratioX, ratioY))
-			})
-		}
-		row4.AddCells(cell)
+	for i, r := range [][]int{{1, 4}, {1, 3}, {1, 2}, {1, 3}, {1, 4}} {
+		row4.AddCells(labelCell(15+i, r[0], r[1]))
 	}
 
 	m.flexBox.AddRows([]*flexbox.Row{row1, row2, row3, row4})
 	m.updateStyles()
 
 	return m
+}
+
+// labelCell makes a cell whose content is its label and ratio.
+func labelCell(idx, ratioX, ratioY int) *flexbox.Cell {
+	return flexbox.NewCell(ratioX, ratioY).SetContentGenerator(func(w, h int) string {
+		return cellContent(cellLabels[idx], ratioX, ratioY, w, h)
+	})
+}
+
+// cellContent centers the label and ratio in a w by h area. With one line it shows only
+// the label and with none it shows nothing, so a short cell keeps its frame.
+func cellContent(label string, ratioX, ratioY, w, h int) string {
+	if w <= 0 || h <= 0 {
+		return ""
+	}
+	text := fmt.Sprintf("%s\n[%d:%d]", label, ratioX, ratioY)
+	if h == 1 {
+		text = label
+	}
+	return lipgloss.NewStyle().
+		Width(w).Height(h).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(text)
 }
 
 // Run starts the demo as a standalone program
