@@ -1,6 +1,9 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
+## Unreleased
+### Fixes
+- A cell's border and margins always render complete when the cell has room for them. Content taller than the cell is clipped to the content area instead of pushing the bottom border out of the cell; a cell with zero lines renders as a blank line of its width in a row and takes no room in a column.
 ## [v1.4.2](https://github.com/76creates/stickers/compare/v1.4.1...v1.4.2) (2025-09-29)
 ### ⚠ BREAKING CHANGES
 - `TableStyleKey` is now `StyleKey`, and names of the keys better reflect their purpose within their package
