@@ -3,6 +3,8 @@ package flexbox
 import (
 	"math"
 	"strings"
+
+	"github.com/charmbracelet/x/ansi"
 )
 
 // TODO: explain this mess using some comments
@@ -151,4 +153,15 @@ func fitHeight(block string, height, top, bottom int) string {
 	kept = append(kept, lines[:top+inner]...)
 	kept = append(kept, lines[len(lines)-bottom:]...)
 	return strings.Join(kept, "\n")
+}
+
+// clipWidth truncates every line of s to width columns, keeping escape sequences intact.
+func clipWidth(s string, width int) string {
+	lines := strings.Split(s, "\n")
+	for i, line := range lines {
+		if ansi.StringWidth(line) > width {
+			lines[i] = ansi.Truncate(line, max(width, 0), "")
+		}
+	}
+	return strings.Join(lines, "\n")
 }

@@ -27,16 +27,16 @@ type Model struct {
 
 const aboutText = `Demo 12: Row Alignment
 
-Demonstrates SetRowAlign for FlexBox.
-
-When rows have varying widths (e.g., from fixed-width
-cells or borders), SetRowAlign controls horizontal
-alignment of the rendered rows.
+SetRowAlign places whole rows inside the box. A row
+narrower than the box sits left, center or right.
+Text inside the cells does not move.
 
 Press 'r' to cycle: Left → Center → Right
 
-Rows 6 & 7 have fixed 140-width to clearly show
-alignment changes. Other rows take full width.
+Rows 6 & 7 have a fixed width of 140. On a wider
+terminal they are narrower than the box and show the
+effect. On a narrower one they run off the right edge
+and are cut. Other rows take full width and never move.
 
 Press 'a' to close | 'q' to quit`
 
@@ -110,7 +110,7 @@ func (m *Model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Row 1: Thick Border\nAlign: %s (r)\n%dx%d", alignNames[m.alignType], w+2, h+2))
+			Render(fmt.Sprintf("Row 1: Thick Border\nRow align: %s (r)\n%dx%d", alignNames[m.alignType], w+2, h+2))
 	})
 	row1.AddCells(cell1)
 
