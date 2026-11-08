@@ -269,7 +269,7 @@ func (m *Model) rebuildFlexBox() {
 		return lipgloss.NewStyle().
 			Width(w).Height(h).
 			Align(lipgloss.Center, lipgloss.Center).
-			Render(fmt.Sprintf("Mixed Fixed/Dynamic Demo\n%s (t) | Text (h)\n%s\n%s\n%dx%d",
+			Render(fmt.Sprintf("Mixed Fixed/Dynamic Demo\n%s (b) | Text (h)\n%s\n%s\n%dx%d",
 				borderNames[m.borderType], modeText, modeDesc, w+m.borderOffset(), h+m.borderOffset()))
 	})
 
