@@ -6,9 +6,8 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Row is the container for the cells, this object has the least to do with the ratio
-// of the construction as it takes all of the needed ratio information from the cell slice
-// rows are stacked vertically
+// Row holds the cells of one row of a FlexBox. Its height comes from the box; its cells'
+// widths and heights come from their ratios and fixed sizes. Rows stack vertically.
 type Row struct {
 	// style of the row
 	style         lipgloss.Style
@@ -27,8 +26,7 @@ type Row struct {
 	recalculateFlag bool
 }
 
-// AddCells appends the cells to the row
-// if the cell ID is not set it will default to the index of the cell
+// AddCells appends cells to the row. A cell without an ID gets its index as its ID.
 func (r *Row) AddCells(cells ...*Cell) *Row {
 	r.cells = append(r.cells, cells...)
 	for i, cell := range r.cells {
@@ -40,8 +38,8 @@ func (r *Row) AddCells(cells ...*Cell) *Row {
 	return r
 }
 
-// SetFixedHeight sets a fixed height for this row, disabling proportional sizing
-// for this specific row. Setting to -1 or 0 will revert to dynamic sizing.
+// SetFixedHeight gives the row a fixed height instead of a ratio-based one. A value of 0
+// or less restores ratio sizing.
 func (r *Row) SetFixedHeight(value int) *Row {
 	r.fixedHeight = value
 	r.setRecalculate()
@@ -53,10 +51,7 @@ func (r *Row) CellsLen() int {
 	return len(r.cells)
 }
 
-// GetCell returns the FlexBoxCell on the given index if it exists
-// note: forces the recalculation if found
-//
-//	returns nil if not found
+// GetCell returns the cell at the index, or nil. The row recalculates on its next render.
 func (r *Row) GetCell(index int) *Cell {
 	if index >= 0 && index < len(r.cells) {
 		r.setRecalculate()
@@ -65,9 +60,8 @@ func (r *Row) GetCell(index int) *Cell {
 	return nil
 }
 
-// GetCellCopy returns a copy of the FlexBoxCell on the given index, if cell
-// does not exist it will return nil. This is useful when you need to get
-// cells attribute without triggering a recalculation.
+// GetCellCopy returns a copy of the cell at the index, or nil. Reading the copy does not
+// trigger a recalculation.
 func (r *Row) GetCellCopy(index int) *Cell {
 	if index >= 0 && index < len(r.cells) {
 		c := r.cells[index].copy()
@@ -76,10 +70,8 @@ func (r *Row) GetCellCopy(index int) *Cell {
 	return nil
 }
 
-// GetCellWithID returns the cell with the given ID if existing
-// note: forces the recalculation if found
-//
-//	returns nil if not found
+// GetCellWithID returns the cell with the ID, or nil. The row recalculates on its next
+// render.
 func (r *Row) GetCellWithID(id string) *Cell {
 	for _, c := range r.cells {
 		if c.id == id {
@@ -90,8 +82,8 @@ func (r *Row) GetCellWithID(id string) *Cell {
 	return nil
 }
 
-// UpdateCellWithIndex replaces the cell on the given index if it exists
-// if its not existing no changes will apply
+// UpdateCellWithIndex replaces the cell at the index. An index out of range changes
+// nothing.
 func (r *Row) UpdateCellWithIndex(index int, cell *Cell) {
 	if index >= 0 && len(r.cells) > 0 && index < len(r.cells) {
 		r.cells[index] = cell
@@ -99,7 +91,8 @@ func (r *Row) UpdateCellWithIndex(index int, cell *Cell) {
 	}
 }
 
-// SetStyle replaces the style, it unsets width/height related keys
+// SetStyle replaces the style. Width and height keys are removed because the box owns
+// the row's size. A border, padding or margin on the row shrinks the area its cells share.
 func (r *Row) SetStyle(style lipgloss.Style) *Row {
 	r.style = style.
 		UnsetWidth().
@@ -110,15 +103,14 @@ func (r *Row) SetStyle(style lipgloss.Style) *Row {
 	return r
 }
 
-// StylePassing set whether the style should be passed to the cells
+// StylePassing sets whether the row's style, including what it inherits from the box, is
+// passed to its cells.
 func (r *Row) StylePassing(value bool) *Row {
 	r.styleAncestor = value
 	return r
 }
 
-// UseStyle sets the Row style and enables StylePassing in one call.
-// This is a convenience method for theme-based styling where you want
-// all child cells to inherit the style.
+// UseStyle sets the style and enables StylePassing in one call.
 func (r *Row) UseStyle(style lipgloss.Style) *Row {
 	r.SetStyle(style)
 	r.StylePassing(true)

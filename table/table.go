@@ -3,34 +3,33 @@ package table
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"reflect"
 	"strings"
 	"unicode/utf8"
 
-	"github.com/x85446/stickers/flexbox"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/flexbox"
 )
 
 var (
 	tableDefaultHeaderStyle = lipgloss.NewStyle().
-		Background(lipgloss.Color("#7158e2")).
-		Foreground(lipgloss.Color("#ffffff"))
+				Background(lipgloss.Color("#7158e2")).
+				Foreground(lipgloss.Color("#ffffff"))
 	tableDefaultFooterStyle = tableDefaultHeaderStyle.Align(lipgloss.Right).Height(1)
 	tableDefaultRowsStyle   = lipgloss.NewStyle().
-		Background(lipgloss.Color("#4b4b4b")).
-		Foreground(lipgloss.Color("#ffffff"))
+				Background(lipgloss.Color("#4b4b4b")).
+				Foreground(lipgloss.Color("#ffffff"))
 	tableDefaultRowsSubsequentStyle = lipgloss.NewStyle().
-		Background(lipgloss.Color("#3d3d3d")).
-		Foreground(lipgloss.Color("#ffffff"))
+					Background(lipgloss.Color("#3d3d3d")).
+					Foreground(lipgloss.Color("#ffffff"))
 	tableDefaultRowsCursorStyle = lipgloss.NewStyle().
-		Background(lipgloss.Color("#f7b731")).
-		Foreground(lipgloss.Color("#000000")).
-		Bold(true)
+					Background(lipgloss.Color("#f7b731")).
+					Foreground(lipgloss.Color("#000000")).
+					Bold(true)
 	tableDefaultCellCursorStyle = lipgloss.NewStyle().
-		Background(lipgloss.Color("#f6e58d")).
-		Foreground(lipgloss.Color("#000000"))
+					Background(lipgloss.Color("#f6e58d")).
+					Foreground(lipgloss.Color("#000000"))
 
 	tableDefaultSortAscChar  = "▲"
 	tableDefaultSortDescChar = "▼"
@@ -46,28 +45,29 @@ var (
 	}
 )
 
+// StyleKey names a part of the table whose style SetStyles can override.
 type StyleKey int
 
+// The parts of the table that take a style.
 const (
-	StyleKeyHeader StyleKey = iota
-	StyleKeyFooter
-	StyleKeyRows
-	StyleKeyRowsSubsequent
-	StyleKeyRowsCursor
-	StyleKeyCellCursor
+	StyleKeyHeader         StyleKey = iota // the header line
+	StyleKeyFooter                         // the footer line with the cursor position
+	StyleKeyRows                           // odd rows
+	StyleKeyRowsSubsequent                 // even rows, so rows alternate for readability
+	StyleKeyRowsCursor                     // the row under the cursor
+	StyleKeyCellCursor                     // the cell under the cursor
 )
 
-// Table responsive, x/y scrollable table that uses magic of FlexBox
+// Table is a responsive table with a one-line header, one-line rows and a one-line
+// footer, laid out with flexbox. It scrolls vertically with the cursor and horizontally
+// when the columns' minimum widths do not fit the table width.
 type Table struct {
 	// columnRatio ratio of the columns, is applied to rows as well
 	columnRatio []int
-	// TODO: would be good to add a suffix "array" or "list" to fields of array type
-	// TODO: change type to uint8
 	// columnMinWidth minimal width of the column
 	columnMinWidth []int
 
 	// columnHeaders column text headers
-	// TODO: make this optional, as well as footer
 	columnHeaders []string
 	columnType    []any
 	rows          [][]any
@@ -84,12 +84,13 @@ type Table struct {
 	// 0 indicates desc sorting, 1 indicates
 	orderedColumnPhase SortingOrderKey
 
-	// TODO: rename rowsTopIndex to follow columnVisibleLeftIndex format
 	// rowsTopIndex top visible index
-	rowsTopIndex    int
-	cursorIndexY    int
-	cursorIndexX    int
-	cursorDirection cursorDirection // not sure if needed
+	rowsTopIndex int
+	cursorIndexY int
+	cursorIndexX int
+	// cursorDirection is the direction of the last cursor move; it decides from which side
+	// the visible column range is built
+	cursorDirection cursorDirection
 
 	// columnVisibleLeftIndex and columnVisibleRightIndex are used to calculate the columns on the screen
 	columnVisibleLeftIndex  int
@@ -114,7 +115,8 @@ type Table struct {
 	updateHeadersFlag bool
 }
 
-// NewTable initialize Table object with defaults
+// NewTable initializes a Table of the given size with one string column per header, all
+// with ratio 1 and no minimum width.
 func NewTable(width, height int, columnHeaders []string) *Table {
 	var columnRatio, columnMinWidth []int
 	for range columnHeaders {
@@ -129,7 +131,7 @@ func NewTable(width, height int, columnHeaders []string) *Table {
 		defaultTypes = append(defaultTypes, defaultType)
 	}
 
-	styles := tableDefaultStyles
+	styles := defaultStyles()
 
 	r := &Table{
 		columnHeaders:           columnHeaders,
@@ -157,7 +159,7 @@ func NewTable(width, height int, columnHeaders []string) *Table {
 		rowHeight:    1,
 
 		headerBox: flexbox.New(width, 1).SetStyle(tableDefaultHeaderStyle),
-		rowsBox:   flexbox.New(width, height-1),
+		rowsBox:   flexbox.New(width, height-2),
 
 		styles:       styles,
 		stylePassing: false,
@@ -167,15 +169,15 @@ func NewTable(width, height int, columnHeaders []string) *Table {
 	return r
 }
 
-// SetRatio replaces the ratio slice, it has to be exactly the len of the headers/rows slices
-// also each value have to be greater than 0, if either fails we panic
+// SetRatio sets the width ratio of every column. It needs exactly one value per column,
+// each greater than 0, and panics otherwise.
 func (r *Table) SetRatio(values []int) *Table {
 	if len(values) != len(r.columnHeaders) {
-		log.Fatalf("ratio list[%d] not of proper length[%d]\n", len(values), len(r.columnHeaders))
+		panic(fmt.Sprintf("table: %d ratios for %d columns", len(values), len(r.columnHeaders)))
 	}
 	for _, val := range values {
 		if val < 1 {
-			log.Fatalf("ratio value must be greater than 0")
+			panic("table: a column ratio must be greater than 0")
 		}
 	}
 	r.columnRatio = values
@@ -184,8 +186,9 @@ func (r *Table) SetRatio(values []int) *Table {
 	return r
 }
 
-// SetTypes sets the column type, setting this will remove all the rows so make sure you do it when instantiating
-// Table object or add new rows after this, types have to be one of Ordered interface types
+// SetTypes sets the type of every column from one zero value per column, such as 0, ""
+// or 0.0, and removes all rows, so call it before adding rows. Accepted types are string,
+// int, int8, int16, int32, int64, float32 and float64.
 func (r *Table) SetTypes(columnTypes ...any) (*Table, error) {
 	if len(columnTypes) != len(r.columnHeaders) {
 		return r, errors.New("column types not the same len as headers")
@@ -205,11 +208,12 @@ func (r *Table) SetTypes(columnTypes ...any) (*Table, error) {
 	return r, nil
 }
 
-// SetMinWidth replaces the minimum width slice, it has to be exactly the len of the headers/rows slices
-// if it's not matching len it will trigger fatal error
+// SetMinWidth sets the minimum width of every column. It needs exactly one value per
+// column and panics otherwise. Minimum widths also decide how many columns are visible at
+// once, see GetVisibleColumnRange.
 func (r *Table) SetMinWidth(values []int) *Table {
 	if len(values) != len(r.columnHeaders) {
-		log.Fatalf("min width list[%d] not of proper length[%d]\n", len(values), len(r.columnHeaders))
+		panic(fmt.Sprintf("table: %d minimum widths for %d columns", len(values), len(r.columnHeaders)))
 	}
 	r.columnMinWidth = values
 	r.setHeadersUpdate()
@@ -217,7 +221,8 @@ func (r *Table) SetMinWidth(values []int) *Table {
 	return r
 }
 
-// SetHeight sets the height of the table including the header and footer
+// SetHeight sets the height of the table. The header and footer take one line each and
+// the rows get the rest.
 func (r *Table) SetHeight(value int) *Table {
 	r.height = value
 	// we deduct two to take header/footer into the account
@@ -237,15 +242,17 @@ func (r *Table) SetWidth(value int) *Table {
 	return r
 }
 
-// GetVisibleColumnRange returns the left and right visible column indexes
+// GetVisibleColumnRange returns the first and last visible column. Columns are visible
+// while their minimum widths fit the table width, starting from the cursor's column;
+// with all minimum widths at 0 every column is visible.
 func (r *Table) GetVisibleColumnRange() (int, int) {
 	return r.columnVisibleLeftIndex, r.columnVisibleRightIndex
 }
 
-// SetStyles allows overrides of styling elements of the table
-// When only a partial set of overrides are provided, the default styling will be used
+// SetStyles overrides the styles of the given parts of the table. Parts left out keep
+// their default style.
 func (r *Table) SetStyles(styles map[StyleKey]lipgloss.Style) *Table {
-	mergedStyles := tableDefaultStyles
+	mergedStyles := defaultStyles()
 	for key, style := range styles {
 		mergedStyles[key] = style
 	}
@@ -255,7 +262,7 @@ func (r *Table) SetStyles(styles map[StyleKey]lipgloss.Style) *Table {
 	return r
 }
 
-// SetStylePassing sets the style passing flag, if true, styles are passed all the way down from box to cell
+// SetStylePassing sets whether the header and row styles are passed down to their cells.
 func (r *Table) SetStylePassing(value bool) *Table {
 	r.stylePassing = value
 	r.headerBox.StylePassing(value)
@@ -265,7 +272,7 @@ func (r *Table) SetStylePassing(value bool) *Table {
 	return r
 }
 
-// UnsetFilter resets filtering
+// UnsetFilter removes the filter so every row is visible again.
 func (r *Table) UnsetFilter() *Table {
 	r.filterString = ""
 	r.filteredColumn = -1
@@ -275,7 +282,9 @@ func (r *Table) UnsetFilter() *Table {
 	return r
 }
 
-// SetFilter sets filtering string on a column
+// SetFilter keeps only the rows whose value in the column contains s, ignoring case. An
+// index out of range changes nothing. The header marks the column and the footer names
+// the filter while the cursor is on that column.
 func (r *Table) SetFilter(columnIndex int, s string) *Table {
 	if columnIndex < len(r.columnHeaders) {
 		r.filterString = s
@@ -286,13 +295,12 @@ func (r *Table) SetFilter(columnIndex int, s string) *Table {
 	return r
 }
 
-// GetFilter returns string used for filtering and the column index
-// TODO: enable multi column filtering
+// GetFilter returns the filtered column, -1 when there is none, and the filter string.
 func (r *Table) GetFilter() (columnIndex int, s string) {
 	return r.filteredColumn, r.filterString
 }
 
-// CursorDown move table cursor down
+// CursorDown moves the cursor one row down, scrolling when it leaves the visible rows.
 func (r *Table) CursorDown() *Table {
 	if r.cursorIndexY+1 < len(r.filteredRows) {
 		r.cursorDirection = r.cursorDirection.setDown()
@@ -303,7 +311,7 @@ func (r *Table) CursorDown() *Table {
 	return r
 }
 
-// CursorUp move table cursor up
+// CursorUp moves the cursor one row up, scrolling when it leaves the visible rows.
 func (r *Table) CursorUp() *Table {
 	if r.cursorIndexY-1 > -1 {
 		r.cursorDirection = r.cursorDirection.setUp()
@@ -314,36 +322,38 @@ func (r *Table) CursorUp() *Table {
 	return r
 }
 
-// CursorLeft move table cursor left
+// CursorLeft moves the cursor one column left, scrolling when it leaves the visible
+// columns.
 func (r *Table) CursorLeft() *Table {
 	if r.cursorIndexX-1 > -1 {
 		r.cursorDirection = r.cursorDirection.setLeft()
 		r.cursorIndexX--
-		// TODO: update row only
 		r.setRowsUpdate()
 		r.checkVisibleColumnRange()
 	}
 	return r
 }
 
-// CursorRight move table cursor right
+// CursorRight moves the cursor one column right, scrolling when it leaves the visible
+// columns.
 func (r *Table) CursorRight() *Table {
 	if r.cursorIndexX+1 < len(r.columnHeaders) {
 		r.cursorDirection = r.cursorDirection.setRight()
 		r.cursorIndexX++
-		// TODO: update row only
 		r.setRowsUpdate()
 		r.checkVisibleColumnRange()
 	}
 	return r
 }
 
-// GetCursorLocation returns the current x,y position of the cursor
+// GetCursorLocation returns the cursor's column and row, both counted from 0 over the
+// visible, filtered rows.
 func (r *Table) GetCursorLocation() (int, int) {
 	return r.cursorIndexX, r.cursorIndexY
 }
 
-// GetCursorValue returns the string of the cell under the cursor
+// GetCursorValue returns the text of the cell under the cursor, or "" when the table has
+// no rows.
 func (r *Table) GetCursorValue() string {
 	// handle 0 rows situation and when table is not active
 	if len(r.filteredRows) == 0 || r.cursorIndexX < 0 || r.cursorIndexY < 0 {
@@ -352,8 +362,9 @@ func (r *Table) GetCursorValue() string {
 	return getStringFromOrdered(r.filteredRows[r.cursorIndexY][r.cursorIndexX])
 }
 
-// AddRows add multiple rows, will return error on the first instance of a row that does not match the type set on table
-// will update rows only when there are no errors
+// AddRows appends rows. Every row must have one value per column, of the column's type;
+// the first row that does not returns an ErrorRowLen, ErrorBadType or ErrorBadCellType
+// and nothing is added.
 func (r *Table) AddRows(rows [][]any) (*Table, error) {
 	// check for errors
 	for _, row := range rows {
@@ -369,7 +380,7 @@ func (r *Table) AddRows(rows [][]any) (*Table, error) {
 	return r, nil
 }
 
-// MustAddRows executes AddRows and panics if there is an error
+// MustAddRows is AddRows that panics on error.
 func (r *Table) MustAddRows(rows [][]any) *Table {
 	if _, err := r.AddRows(rows); err != nil {
 		panic(err)
@@ -377,14 +388,16 @@ func (r *Table) MustAddRows(rows [][]any) *Table {
 	return r
 }
 
-// ClearRows removes all previously added rows, can be used as part of an update loop
+// ClearRows removes every row, for example before reloading data in an update loop.
 func (r *Table) ClearRows() *Table {
 	r.rows = make([][]any, 0, 10)
 	r.setRowsUpdate()
 	return r
 }
 
-// Render renders the table into the string
+// Render returns the header, the visible rows and a footer that reads "x:y / w:h", the
+// cursor position and the rows area size, prefixed by the filter when the cursor is on the
+// filtered column.
 func (r *Table) Render() string {
 	r.updateRows()
 	r.updateHeader()
@@ -406,6 +419,16 @@ func (r *Table) Render() string {
 		r.rowsBox.Render(),
 		r.styles[StyleKeyFooter].Width(r.width).Render(statusMessage),
 	)
+}
+
+// defaultStyles returns a copy of the default styles, so overrides on one table never
+// reach the package defaults or another table.
+func defaultStyles() map[StyleKey]lipgloss.Style {
+	styles := make(map[StyleKey]lipgloss.Style, len(tableDefaultStyles))
+	for key, style := range tableDefaultStyles {
+		styles[key] = style
+	}
+	return styles
 }
 
 func (r *Table) setRowsUpdate() {
@@ -438,7 +461,7 @@ func (r *Table) validateRow(cells ...any) error {
 	// check cell type
 	for i, c := range cells {
 		switch c.(type) {
-		case string, int, int8, int16, int32, float32, float64:
+		case string, int, int8, int16, int32, int64, float32, float64:
 			// check if the cell matches the type of the column
 			if reflect.TypeOf(c) != reflect.TypeOf(r.columnType[i]) {
 				message = fmt.Sprintf(
@@ -552,8 +575,8 @@ func (r *Table) updateRows() {
 		for ic, column := range columns[r.columnVisibleLeftIndex : r.columnVisibleRightIndex+1] {
 			icCorrected := ic + r.columnVisibleLeftIndex
 			// initialize column cell
-			c := flexbox.NewCell(r.columnRatio[ic], r.rowHeight).
-				SetMinWidth(r.columnMinWidth[ic]).
+			c := flexbox.NewCell(r.columnRatio[icCorrected], r.rowHeight).
+				SetMinWidth(r.columnMinWidth[icCorrected]).
 				SetContent(getStringFromOrdered(column))
 			// update style if cursor is on the cell, otherwise it's inherited from the row
 			if irCorrected == r.cursorIndexY && icCorrected == r.cursorIndexX {
@@ -566,7 +589,6 @@ func (r *Table) updateRows() {
 
 		// rows have three styles, normal, subsequent and selected
 		// normal and subsequent rows should differ for readability
-		// TODO: make this ^ optional
 		if irCorrected == r.cursorIndexY {
 			rw.SetStyle(r.styles[StyleKeyRowsCursor])
 		} else if irCorrected%2 == 0 || irCorrected == 0 {

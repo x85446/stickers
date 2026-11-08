@@ -6,21 +6,25 @@ import (
 	"strconv"
 )
 
+// Ordered is the set of types a column can hold and sort by.
 type Ordered interface {
 	int | int8 | int32 | int16 | int64 | float32 | float64 | string
 }
 
+// SortingOrderKey is the direction of a sort.
 type SortingOrderKey int
 
+// The two sort directions.
 const (
-	SortingOrderAscending SortingOrderKey = iota
-	SortingOrderDescending
+	SortingOrderAscending  SortingOrderKey = iota // smallest first
+	SortingOrderDescending                        // largest first
 )
 
-// GetOrder returns the current order column index and phase
+// GetOrder returns the sorted column, -1 when the rows are unsorted, and the direction.
 func (r *Table) GetOrder() (int, SortingOrderKey) { return r.orderedColumnIndex, r.orderedColumnPhase }
 
-// OrderByAsc orders rows by a column with index n, in ascending order
+// OrderByAsc sorts the rows by the column at index, smallest first, comparing values of
+// the column's type. An index out of range, or fewer than two rows, changes nothing.
 func (r *Table) OrderByAsc(index int) *Table {
 	// sanity check first, we won't return errors here, simply ignore if the user sends non-existing index
 	if index < len(r.columnHeaders) && len(r.filteredRows) > 1 {
@@ -33,7 +37,8 @@ func (r *Table) OrderByAsc(index int) *Table {
 	return r
 }
 
-// OrderByDesc orders rows by a column with index n, in descending order
+// OrderByDesc sorts the rows by the column at index, largest first, comparing values of
+// the column's type. An index out of range, or fewer than two rows, changes nothing.
 func (r *Table) OrderByDesc(index int) *Table {
 	// sanity check first, we won't return errors here, simply ignore if the user sends non existing index
 	if index < len(r.columnHeaders) && len(r.filteredRows) > 1 {
@@ -44,27 +49,6 @@ func (r *Table) OrderByDesc(index int) *Table {
 		r.setHeadersUpdate()
 	}
 	return r
-}
-
-// updateOrderedVars updates bits and pieces revolving around ordering
-// toggling between asc and desc
-// updating ordering vars on TableOrdered
-func (r *Table) updateOrderedVars(index int) {
-	// toggle between ascending and descending and set default first sort to ascending
-	if r.orderedColumnIndex == index {
-		switch r.orderedColumnPhase {
-		case SortingOrderAscending:
-			r.orderedColumnPhase = SortingOrderDescending
-
-		case SortingOrderDescending:
-			r.orderedColumnPhase = SortingOrderAscending
-		}
-	} else {
-		r.orderedColumnPhase = SortingOrderDescending
-	}
-	r.orderedColumnIndex = index
-
-	r.setHeadersUpdate()
 }
 
 func sortRows(rows [][]any, index int, orderKey SortingOrderKey) [][]any {
@@ -87,7 +71,7 @@ func sortRows(rows [][]any, index int, orderKey SortingOrderKey) [][]any {
 // isOrdered check if type is one of valid Ordered types
 func isOrdered(e any) bool {
 	switch e.(type) {
-	case string, int, int8, int16, int32, float32, float64:
+	case string, int, int8, int16, int32, int64, float32, float64:
 		return true
 	default:
 		return false
@@ -183,8 +167,8 @@ func sortIndexByOrderedColumn(i []any, order SortingOrderKey) (sortedIndex []int
 	}
 }
 
-// sortIndex is simple generic bubble sort, returns sorted index slice
-// bubble sort implemented for simplicity, if you need faster alg feel free to open a PR for it :zap:
+// sortIndex bubble-sorts slice in the given order and returns the original index of each
+// element in its sorted position.
 func sortIndex[T Ordered](slice []T, order SortingOrderKey) []int {
 	// could do this in sortIndexByOrderedColumn where we cycle through the slice anyhow
 	// tho I think this is cheap op and makes code a bit cleaner, worthy trade for now
@@ -196,10 +180,10 @@ func sortIndex[T Ordered](slice []T, order SortingOrderKey) []int {
 	// bubble sort slice and update index in a process
 	for i := len(slice); i > 0; i-- {
 		for j := 1; j < i; j++ {
-			if order == SortingOrderDescending && slice[j] < slice[j-1] {
+			if order == SortingOrderDescending && slice[j] > slice[j-1] {
 				slice[j], slice[j-1] = slice[j-1], slice[j]
 				index[j], index[j-1] = index[j-1], index[j]
-			} else if order == SortingOrderAscending && slice[j] > slice[j-1] {
+			} else if order == SortingOrderAscending && slice[j] < slice[j-1] {
 				slice[j], slice[j-1] = slice[j-1], slice[j]
 				index[j], index[j-1] = index[j-1], index[j]
 			}

@@ -2,7 +2,8 @@ package flexbox
 
 import "github.com/charmbracelet/lipgloss"
 
-// FlexBox responsive box grid inspired by CSS flexbox
+// FlexBox is a responsive grid of rows, each holding cells side by side. Rows stack
+// vertically and share the box height by ratio or fixed size.
 type FlexBox struct {
 	// style to apply to the gridbox itself
 	style         lipgloss.Style
@@ -26,7 +27,7 @@ type FlexBox struct {
 	rowAlign lipgloss.Position
 }
 
-// New initialize FlexBox object with defaults
+// New initializes a FlexBox of the given size with no rows and an empty style.
 func New(width, height int) *FlexBox {
 	r := &FlexBox{
 		width:           width,
@@ -39,7 +40,9 @@ func New(width, height int) *FlexBox {
 	return r
 }
 
-// SetStyle replaces the style, it unsets width/height related keys
+// SetStyle replaces the style. Width and height keys are removed because the box's size
+// is set with SetWidth and SetHeight. A border, padding or margin shrinks the area the
+// rows share.
 func (r *FlexBox) SetStyle(style lipgloss.Style) *FlexBox {
 	r.style = style.
 		UnsetWidth().
@@ -49,30 +52,29 @@ func (r *FlexBox) SetStyle(style lipgloss.Style) *FlexBox {
 	return r
 }
 
-// StylePassing set whether the style should be passed to the rows
+// StylePassing sets whether the box's style is passed to its rows. A row passes it on to
+// its cells only when its own StylePassing is enabled.
 func (r *FlexBox) StylePassing(value bool) *FlexBox {
 	r.styleAncestor = value
 	return r
 }
 
-// UseStyle sets the FlexBox style and enables StylePassing in one call.
-// This is a convenience method for theme-based styling where you want
-// all child rows and cells to inherit the style.
+// UseStyle sets the style and enables StylePassing in one call.
 func (r *FlexBox) UseStyle(style lipgloss.Style) *FlexBox {
 	r.SetStyle(style)
 	r.StylePassing(true)
 	return r
 }
 
-// SetRowAlign sets the horizontal alignment used when joining rows vertically.
-// Use lipgloss.Left, lipgloss.Center, or lipgloss.Right.
-// Default is lipgloss.Left for backwards compatibility.
+// SetRowAlign places rows narrower than the box, such as rows of fixed-width cells, at
+// lipgloss.Left, lipgloss.Center or lipgloss.Right. Full-width rows are unaffected. The
+// default is lipgloss.Left.
 func (r *FlexBox) SetRowAlign(align lipgloss.Position) *FlexBox {
 	r.rowAlign = align
 	return r
 }
 
-// NewRow initialize a new Row with width inherited from the FlexBox
+// NewRow initializes an empty Row of the box's width. Add it with AddRows or SetRows.
 func (r *FlexBox) NewRow() *Row {
 	rw := &Row{
 		cells: []*Cell{},
@@ -82,14 +84,14 @@ func (r *FlexBox) NewRow() *Row {
 	return rw
 }
 
-// AddRows appends additional rows to the FlexBox
+// AddRows appends rows to the box.
 func (r *FlexBox) AddRows(rows []*Row) *FlexBox {
 	r.rows = append(r.rows, rows...)
 	r.setRecalculate()
 	return r
 }
 
-// SetRows replace rows on the FlexBox
+// SetRows replaces all rows of the box.
 func (r *FlexBox) SetRows(rows []*Row) *FlexBox {
 	r.rows = rows
 	r.setRecalculate()
@@ -101,10 +103,7 @@ func (r *FlexBox) RowsLen() int {
 	return len(r.rows)
 }
 
-// GetRow returns the Row on the given index if it exists
-// note: forces the recalculation if found
-//
-//	returns nil if not found
+// GetRow returns the row at the index, or nil. The box recalculates on its next render.
 func (r *FlexBox) GetRow(index int) *Row {
 	if index >= 0 && index < len(r.rows) {
 		r.setRecalculate()
@@ -113,10 +112,8 @@ func (r *FlexBox) GetRow(index int) *Row {
 	return nil
 }
 
-// GetRowCopy returns a copy of the Row on the given index, if row
-// does not exist it will return nil. Copied row also gets copies of the
-// cells. This is useful when you need to get rows attribute without
-// triggering a recalculation.
+// GetRowCopy returns a copy of the row at the index, with copies of its cells, or nil.
+// Reading the copy does not trigger a recalculation.
 func (r *FlexBox) GetRowCopy(index int) *Row {
 	if index >= 0 && index < len(r.rows) {
 		rowCopy := r.rows[index].copy()
@@ -125,10 +122,8 @@ func (r *FlexBox) GetRowCopy(index int) *Row {
 	return nil
 }
 
-// GetRowCellCopy returns a copy of the FlexBoxCell on the given index x,
-// within the given row with index y, if row or cell do not exist it will
-// return nil. This is useful when you need to get rows attribute without
-// triggering a recalculation.
+// GetRowCellCopy returns a copy of the cell at cellIndex in the row at rowIndex, or nil.
+// Reading the copy does not trigger a recalculation.
 func (r *FlexBox) GetRowCellCopy(rowIndex, cellIndex int) *Cell {
 	if rowIndex >= 0 && rowIndex < len(r.rows) {
 		if cellIndex >= 0 && cellIndex < len(r.rows[rowIndex].cells) {
@@ -139,15 +134,15 @@ func (r *FlexBox) GetRowCellCopy(rowIndex, cellIndex int) *Cell {
 	return nil
 }
 
-// UpdateRow replaces the Row on the given index
+// UpdateRow replaces the row at the index. The index must exist.
 func (r *FlexBox) UpdateRow(index int, row *Row) *FlexBox {
 	r.rows[index] = row
 	r.setRecalculate()
 	return r
 }
 
-// LockRowHeight sets the fixed height value for all the rows
-// this will disable vertical scaling
+// LockRowHeight pins every row to the given number of lines, which disables vertical
+// scaling. A value of 0 or less restores ratio sizing.
 func (r *FlexBox) LockRowHeight(value int) *FlexBox {
 	r.fixedRowHeight = value
 	return r
@@ -179,8 +174,8 @@ func (r *FlexBox) GetWidth() int {
 	return r.getMaxWidth()
 }
 
-// Render initiates the recalculation of the rows dimensions(height) if the recalculate flag is on,
-// and then it renders all the rows and combines them on the vertical axis
+// Render lays out the rows if anything changed since the last render, renders each row,
+// and joins them vertically with the row alignment, inside the box's own style.
 func (r *FlexBox) Render() string {
 	var inheritedStyle []lipgloss.Style
 	if r.styleAncestor {
@@ -198,7 +193,7 @@ func (r *FlexBox) Render() string {
 		Render(lipgloss.JoinVertical(r.rowAlign, renderedRows...))
 }
 
-// ForceRecalculate forces the recalculation for the box and all the rows
+// ForceRecalculate lays out the box and every row now instead of at the next render.
 func (r *FlexBox) ForceRecalculate() {
 	r.recalculate()
 	for _, rw := range r.rows {

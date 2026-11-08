@@ -7,16 +7,14 @@ import (
 	"github.com/charmbracelet/x/ansi"
 )
 
-// Cell is a building block object of the FlexBox, it represents a single cell within a box
-// A FlexBox stacks cells horizontally.
-// A HorizontalFlexBox stacks cells vertically. (controverse, isn't it?)
+// Cell is the building block of a grid. In a FlexBox the cells of a row sit side by
+// side; in a HorizontalFlexBox the cells of a column stack vertically.
 type Cell struct {
 	// style of the cell, when rendering it will inherit the style of the parent row
 	style lipgloss.Style
 	// id of the cell, if not set it will default to the index in the row
 	id string
 
-	// TODO: all ratios and sizes should be uint
 	// ratioX width ratio of the cell
 	ratioX int
 	// ratioY height ratio of the cell
@@ -53,8 +51,8 @@ func WithStyle(style lipgloss.Style) CellOption {
 	}
 }
 
-// NewCell initialize FlexBoxCell object with defaults.
-// Optional CellOption parameters can be provided for configuration.
+// NewCell initializes a Cell with the given width and height ratios and an empty style.
+// Options such as WithStyle configure the cell before it is returned.
 func NewCell(ratioX, ratioY int, opts ...CellOption) *Cell {
 	c := &Cell{
 		style:    lipgloss.NewStyle(),
@@ -70,13 +68,15 @@ func NewCell(ratioX, ratioY int, opts ...CellOption) *Cell {
 	return c
 }
 
-// SetID sets the cells ID
+// SetID names the cell for GetCellWithID. Unnamed cells get their index in the row or
+// column as their ID.
 func (r *Cell) SetID(id string) *Cell {
 	r.id = id
 	return r
 }
 
-// SetContent sets the cells content
+// SetContent sets static content. The cell wraps it at its content width and clips it
+// to its content height when it renders.
 func (r *Cell) SetContent(content string) *Cell {
 	r.contentGenerator = func(_, _ int) string {
 		return content
@@ -84,13 +84,16 @@ func (r *Cell) SetContent(content string) *Cell {
 	return r
 }
 
-// SetContentGenerator sets the cells content generator function
+// SetContentGenerator sets a function that builds the content each time the cell
+// renders. It receives the width and height inside the border and margins; padding, if
+// the style has any, lies inside that area.
 func (r *Cell) SetContentGenerator(generator func(maxX, maxY int) string) *Cell {
 	r.contentGenerator = generator
 	return r
 }
 
-// GetContent returns the cells raw content
+// GetContent returns the content as set or as the generator builds it for the cell's
+// current content size, before wrapping and clipping.
 func (r *Cell) GetContent() string {
 	if r.contentGenerator == nil {
 		return ""
@@ -98,16 +101,16 @@ func (r *Cell) GetContent() string {
 	return r.contentGenerator(r.getContentWidth(), r.getContentHeight())
 }
 
-// SetMinWidth sets the cells minimum width, this will not disable responsivness.
-// This has only an effect to cells of a normal FlexBox, not a HorizontalFlexBox.
+// SetMinWidth keeps a ratio-sized cell at least this wide while it stays responsive.
+// It applies to cells of a FlexBox only, not a HorizontalFlexBox.
 func (r *Cell) SetMinWidth(value int) *Cell {
 	r.minWidth = value
 	return r
 }
 
-// SetFixedWidth sets a fixed width for this cell, disabling proportional sizing
-// for this specific cell. Setting to -1 or 0 will revert to dynamic sizing.
-// This has only an effect to cells of a normal FlexBox, not a HorizontalFlexBox.
+// SetFixedWidth gives the cell a fixed width instead of a ratio-based one. A value of 0
+// or less restores ratio sizing. It applies to cells of a FlexBox only, not a
+// HorizontalFlexBox.
 func (r *Cell) SetFixedWidth(value int) *Cell {
 	r.fixedWidth = value
 	return r
@@ -118,21 +121,23 @@ func (r *Cell) SetMinHeigth(value int) *Cell {
 	return r.SetMinHeight(value)
 }
 
-// SetMinHeight sets the cells minimum height, this will not disable responsivness.
-// This has only an effect to cells of a HorizontalFlexBox.
+// SetMinHeight keeps a ratio-sized cell at least this tall while it stays responsive.
+// It applies to cells of a HorizontalFlexBox only, not a FlexBox.
 func (r *Cell) SetMinHeight(value int) *Cell {
 	r.minHeight = value
 	return r
 }
 
-// SetFixedHeight sets a fixed height request for the cell
-// Note: All cells in a row will have the same height (the maximum requested)
+// SetFixedHeight asks for a fixed height for the cell's row. The row takes the largest
+// request among its cells, so every cell in it gets that height. A value of 0 or less
+// withdraws the request. It applies to cells of a FlexBox only, not a HorizontalFlexBox.
 func (r *Cell) SetFixedHeight(value int) *Cell {
 	r.fixedHeight = value
 	return r
 }
 
-// SetStyle replaces the style, it unsets width/height related keys
+// SetStyle replaces the style. Width and height keys are removed because the grid owns
+// the cell's size.
 func (r *Cell) SetStyle(style lipgloss.Style) *Cell {
 	r.style = style.
 		UnsetWidth().
