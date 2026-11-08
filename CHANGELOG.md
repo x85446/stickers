@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 ### Fixes
 - A cell's border and margins always render complete when the cell has room for them. Content taller than the cell is clipped to the content area instead of pushing the bottom border out of the cell; a cell with zero lines renders as a blank line of its width in a row and takes no room in a column.
 - A row clips cells that stick out past its edge, such as a fixed-width cell wider than the box, instead of word-wrapping them onto extra lines. A cell with zero width adds no columns to its row.
+### Examples
+- `make demo-all` opens on a splash screen, shows one header format for every demo (name, the demo's own keys, then `a`, `tab`, `shift+tab`, `q`), and every demo fits under the header at any terminal size.
+- demo-7 cells show only their label when one line fits and nothing when none does; the border cycle runs Fill, Hidden, Normal, Rounded, Thick, Double.
+- demo-10's header row keeps its text in dynamic mode; demo-11 no longer crashes on its first resize; demo-12's about text explains row alignment and the cut on narrow terminals.
+- All demo sources are tracked; the `.gitignore` patterns for demo binaries are anchored to the repository root.
+### Documentation
+- README is a developer guide to both packages: sizing rules, what a cell shows when it does not fit, styles, reading the grid back, the table API, demos and tests.
+- Package documentation for `flexbox` and `table`, and every exported identifier has a doc comment.
 ## [v1.4.2](https://github.com/76creates/stickers/compare/v1.4.1...v1.4.2) (2025-09-29)
 ### ⚠ BREAKING CHANGES
 - `TableStyleKey` is now `StyleKey`, and names of the keys better reflect their purpose within their package
