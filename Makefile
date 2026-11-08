@@ -1,4 +1,4 @@
-.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 demo-10 demo-10-log demo-11 demo-12 demo-all log log-follow help clean
+.PHONY: demo-1 demo-2 demo-3 demo-4 demo-5 demo-6 demo-7 demo-8 demo-9 demo-10 demo-11 demo-12 demo-all help clean
 
 help:
 	@echo "Available demos (press 'q' or Ctrl+C to exit):"
@@ -44,13 +44,8 @@ help:
 	@echo "  make demo-12 - FlexBox Row Alignment"
 	@echo "                 Demonstrates SetRowAlign for varying row widths (r)"
 	@echo ""
-	@echo "Logging commands:"
-	@echo "  make demo-10-log - Run demo-10 with size logging"
-	@echo "  make log         - View the last 50 lines of the log"
-	@echo "  make log-follow  - Follow the log in real-time"
-	@echo ""
 	@echo "Utilities:"
-	@echo "  make clean       - Remove log files and build artifacts"
+	@echo "  make clean       - Remove build artifacts"
 
 demo-all:
 	@cd example && go run ./demo-all
@@ -85,33 +80,15 @@ demo-9:
 demo-10:
 	@go run ./example/demo-10-flex-box-mixed-fixed/cmd
 
-demo-10-log:
-	@echo "Starting demo-10 with logging to demo10_size_log.txt..."
-	@go run ./example/demo-10-flex-box-mixed-fixed/main_with_log.go
-
 demo-11:
 	@go run ./example/demo-11-flex-box-cell-config/cmd
 
 demo-12:
 	@go run ./example/demo-12-flex-box-row-align/cmd
 
-log:
-	@if [ -f demo10_size_log.txt ]; then \
-		echo "=== Viewing last 50 lines of demo10_size_log.txt ==="; \
-		tail -50 demo10_size_log.txt; \
-	else \
-		echo "No log file found. Run 'make demo-10-log' first."; \
-	fi
-
-log-follow:
-	@echo "Following demo10_size_log.txt (Ctrl+C to stop)..."
-	@touch demo10_size_log.txt
-	@tail -f demo10_size_log.txt
-
 clean:
 	@echo "Cleaning up..."
 	@-pkill -f "go-build.*main" 2>/dev/null || true
-	@rm -f demo10_size_log.txt
 	@rm -f main
 	@rm -f demo-1-flex-box-simple demo-2-flex-box-horizonal demo-6-flex-box-nested-borders demo-7-flex-box-simple-borders
 	@rm -f demo-8-flex-box-fixed-rows demo-9-flex-box-fixed-width demo-10-flex-box-mixed-fixed demo-11-flex-box-cell-config demo-12-flex-box-row-align

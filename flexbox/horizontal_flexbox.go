@@ -22,6 +22,9 @@ type HorizontalFlexBox struct {
 	// recalculateFlag indicates if next render should make calculations regarding
 	// the columns objects height
 	recalculateFlag bool
+
+	// columnAlign places the columns inside the box when together they are narrower than it
+	columnAlign lipgloss.Position
 }
 
 // NewHorizontal initializes a HorizontalFlexBox of the given size with no columns and an
@@ -33,7 +36,16 @@ func NewHorizontal(width, height int) *HorizontalFlexBox {
 		fixedColumnWidth: -1,
 		style:            lipgloss.NewStyle(),
 		recalculateFlag:  false,
+		columnAlign:      lipgloss.Left,
 	}
+	return r
+}
+
+// SetColumnAlign places the columns inside the box when together they are narrower than
+// it, such as columns of a locked width, at lipgloss.Left, lipgloss.Center or
+// lipgloss.Right. The default is lipgloss.Left.
+func (r *HorizontalFlexBox) SetColumnAlign(align lipgloss.Position) *HorizontalFlexBox {
+	r.columnAlign = align
 	return r
 }
 
@@ -165,7 +177,8 @@ func (r *HorizontalFlexBox) GetWidth() int {
 }
 
 // Render lays out the columns if anything changed since the last render, renders each
-// column, and joins them horizontally inside the box's own style.
+// column, joins them horizontally, places them with the column alignment, and wraps the
+// result in the box's own style.
 func (r *HorizontalFlexBox) Render() string {
 	var inheritedStyle []lipgloss.Style
 	if r.styleAncestor {
@@ -177,11 +190,12 @@ func (r *HorizontalFlexBox) Render() string {
 	for _, column := range r.columns {
 		renderedColumns = append(renderedColumns, column.render(inheritedStyle...))
 	}
-	// TODO: allow setting join align value for columns of variable width
+	joined := lipgloss.PlaceHorizontal(r.getContentWidth(), r.columnAlign,
+		lipgloss.JoinHorizontal(lipgloss.Top, renderedColumns...))
 	return r.style.
 		Width(r.getContentWidth()).MaxWidth(r.getMaxWidth()).
 		Height(r.getContentHeight()).MaxHeight(r.getMaxHeight()).
-		Render(lipgloss.JoinHorizontal(lipgloss.Top, renderedColumns...))
+		Render(joined)
 }
 
 // ForceRecalculate lays out the box and every column now instead of at the next render.

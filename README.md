@@ -177,6 +177,9 @@ vertically inside each column.
 - `SetFixedWidth`, `SetFixedHeight` and `SetMinWidth` apply to cells of a
   `FlexBox` only. `SetMinHeight` applies to cells of a `HorizontalFlexBox`
   only.
+- `SetColumnAlign(pos)` places the columns inside the box when together they
+  are narrower than it, such as columns of a locked width, at `lipgloss.Left`,
+  `lipgloss.Center` or `lipgloss.Right`. The default is left.
 - `GetColumn`, `GetColumnCopy`, `GetColumnCellCopy`, `UpdateColumn` and
   `ColumnsLen` mirror the `FlexBox` row methods.
 
@@ -213,7 +216,7 @@ s := t.Render()
 
 - **Types.** Every column is `string` until `SetTypes` is called with one zero
   value per column. Accepted types are `string`, `int`, `int8`, `int16`,
-  `int32`, `float32` and `float64`. `SetTypes` clears existing rows.
+  `int32`, `int64`, `float32` and `float64`. `SetTypes` clears existing rows.
 - **Rows.** `AddRows` validates each row's length and cell types and returns
   the first error without adding anything. `MustAddRows` panics instead.
   `ClearRows` empties the table.
@@ -236,8 +239,8 @@ s := t.Render()
   leave out keep their defaults. `SetStylePassing(true)` passes the row styles
   down to the cells.
 - **Sizing checks.** `SetRatio` and `SetMinWidth` must receive exactly one
-  value per column, and ratios must be greater than zero. A mismatch calls
-  `log.Fatalf` and ends the program.
+  value per column, and ratios must be greater than zero. A mismatch panics,
+  since it is a programming error.
 
 ![Table Multi-Type](.github/images/table-multi-type.gif)
 

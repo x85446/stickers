@@ -1,7 +1,5 @@
 package table
 
-// TODO: create cursor struct that holds the cursor position and direction
-
 // cursorDirection indicates the direction of the cursor movement, it starts at the up left direction
 type cursorDirection uint8
 

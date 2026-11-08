@@ -20,8 +20,7 @@ vendor/
 /example/demo-5-table-multi-type/demo-5-table-multi-type
 /example/*/cmd/cmd
 
-# Log files and scratch
-demo10_size_log.txt
+# Scratch
 /tmp/
 
 # direnv badge, per-machine

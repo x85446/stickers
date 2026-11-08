@@ -34,8 +34,6 @@ func calculateRatioWithMinimum(distribute int, matrix []int, minimumMatrix []int
 			ratioDistribution[i] = d
 		}
 	}
-	// TODO: calculate remainder and if negative shrink right most column
-
 	return ratioDistribution
 }
 
@@ -60,12 +58,7 @@ func calculateRatio(distribute int, matrix []int) (ratioDistribution []int) {
 		if remainder > 0 {
 			for index, remainderAdded := range distributeRemainder(remainder, matrix) {
 				ratioDistribution[index] += remainderAdded
-				remainder -= remainderAdded
 			}
-		}
-		// TODO: rethink maybe, does this fn belong here
-		if remainder < 0 {
-			// happens when there is minimum value
 		}
 	}
 

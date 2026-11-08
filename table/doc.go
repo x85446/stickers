@@ -15,7 +15,7 @@
 //	s := t.Render()
 //
 // Columns are strings until SetTypes is called. Accepted column types are string, int,
-// int8, int16, int32, float32 and float64; rows are validated against them when added,
+// int8, int16, int32, int64, float32 and float64; rows are validated against them when added,
 // and sorting compares values of the column's type. Filtering is a case-insensitive
 // substring match on one column.
 //
