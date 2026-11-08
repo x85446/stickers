@@ -2,6 +2,7 @@ package flexbox
 
 import (
 	"math"
+	"strings"
 )
 
 // TODO: explain this mess using some comments
@@ -120,4 +121,34 @@ func distributeRemainder(remainder int, matrixMaxRatio []int) (remainderDistribu
 	}
 
 	return remainderDistribution
+}
+
+// clipLines keeps at most n lines of s.
+func clipLines(s string, n int) string {
+	lines := strings.Split(s, "\n")
+	if len(lines) <= n {
+		return s
+	}
+	return strings.Join(lines[:n], "\n")
+}
+
+// fitHeight trims a rendered block to height lines. It cuts from the inside, between the
+// top frame (margin and border) and the bottom frame, so both survive whenever height has
+// room for them; below that it keeps the top lines.
+func fitHeight(block string, height, top, bottom int) string {
+	lines := strings.Split(block, "\n")
+	if len(lines) <= height {
+		return block
+	}
+	if height <= 0 {
+		return ""
+	}
+	inner := height - top - bottom
+	if inner < 0 {
+		return strings.Join(lines[:height], "\n")
+	}
+	kept := make([]string, 0, height)
+	kept = append(kept, lines[:top+inner]...)
+	kept = append(kept, lines[len(lines)-bottom:]...)
+	return strings.Join(kept, "\n")
 }

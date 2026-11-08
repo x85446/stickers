@@ -1,7 +1,10 @@
 package flexbox
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // Cell is a building block object of the FlexBox, it represents a single cell within a box
@@ -158,16 +161,39 @@ func (r *Cell) GetHeight() int {
 	return r.getMaxHeight()
 }
 
-// render the cell into string
+// render the cell into string.
+//
+// The frame (margins and border) renders complete whenever the cell has room for it:
+// the content is wrapped the way lipgloss wraps it and clipped to the lines left between
+// the paddings, so content taller than the cell loses its bottom lines, never the border.
+// A cell with no lines renders as one blank line of its width so a row keeps its columns.
 func (r *Cell) render(inherited ...lipgloss.Style) string {
 	for _, style := range inherited {
 		r.style = r.style.Inherit(style)
 	}
 
+	if r.getMaxHeight() <= 0 {
+		return strings.Repeat(" ", max(r.getMaxWidth(), 0))
+	}
+
 	s := r.GetStyle().
 		Width(r.getContentWidth()).MaxWidth(r.getMaxWidth()).
-		Height(r.getContentHeight()).MaxHeight(r.getMaxHeight())
-	return s.Render(r.GetContent())
+		Height(r.getContentHeight())
+	block := s.Render(r.fitContent(r.GetContent()))
+	return fitHeight(block, r.getMaxHeight(),
+		r.style.GetMarginTop()+r.style.GetBorderTopSize(),
+		r.style.GetBorderBottomSize()+r.style.GetMarginBottom())
+}
+
+// fitContent wraps content at the width lipgloss wraps it and keeps the lines that fit
+// between the vertical paddings.
+func (r *Cell) fitContent(content string) string {
+	wrapAt := r.getContentWidth() - r.style.GetHorizontalPadding()
+	lines := r.getContentHeight() - r.style.GetVerticalPadding()
+	if wrapAt <= 0 || lines <= 0 {
+		return ""
+	}
+	return clipLines(ansi.Wrap(content, wrapAt, ""), lines)
 }
 
 func (r *Cell) getContentWidth() int {

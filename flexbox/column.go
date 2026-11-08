@@ -139,6 +139,10 @@ func (r *Column) render(inherited ...lipgloss.Style) string {
 	r.recalculate()
 	var renderedCells []string
 	for _, cell := range r.cells {
+		// a cell with no lines takes no room in the column
+		if cell.getMaxHeight() <= 0 {
+			continue
+		}
 		renderedCells = append(renderedCells, cell.render(inheritedStyle...))
 	}
 	return r.style.
