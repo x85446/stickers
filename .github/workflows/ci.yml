@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+    branches: [master, v1, v2]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Test (Go ${{ matrix.go }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.24", stable]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go }}
+      - name: Test the library with the race detector
+        run: go test -race ./...
+      - name: Test the demos
+        run: make test-integration
+      - name: Build everything
+        run: make build
+
+  library-minimum-go:
+    name: Test the library (Go 1.23)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23"
+      - run: make test-unit
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - name: Lint the library
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.15
+      - name: Lint the demos
+        uses: golangci/golangci-lint-action@v8
+        with:
+          version: v2.15
+          working-directory: example
+          args: --config ../.golangci.yml
