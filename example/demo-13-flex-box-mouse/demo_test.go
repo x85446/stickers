@@ -59,3 +59,17 @@ func TestArrowsCycleTheSelection(t *testing.T) {
 		t.Fatal("the about box does not show, or the cursor shows on top of it")
 	}
 }
+
+// TestNoCursorWithoutRoom: a window too small for a cell's content shows no cursor, and
+// the demo renders at any size.
+func TestNoCursorWithoutRoom(t *testing.T) {
+	for _, size := range [][2]int{{8, 1}, {0, 0}, {3, 3}, {1, 20}} {
+		m := New()
+		m.Update(tea.WindowSizeMsg{Width: size[0], Height: size[1]})
+		if view := m.View(); view.Cursor != nil && m.cells[m.selected].GetContentBounds().Empty() {
+			t.Fatalf("a %dx%d window shows a cursor at %+v in a cell without room", size[0], size[1], view.Cursor)
+		}
+		m.Update(tea.KeyPressMsg{Code: 'a', Text: "a"})
+		m.View()
+	}
+}

@@ -140,3 +140,30 @@ func TestPasteExtendsTheFilter(t *testing.T) {
 		t.Fatalf("an empty paste changed the filter to %q", filter)
 	}
 }
+
+// TestBackspaceRemovesACharacter: the filter loses its last character whole, whatever
+// its size in bytes.
+func TestBackspaceRemovesACharacter(t *testing.T) {
+	tb := people()
+	Update(tb, tea.PasteMsg{Content: "a日é"}, image.Point{})
+	for _, want := range []string{"a日", "a"} {
+		Update(tb, press(tea.KeyBackspace, "", 0), image.Point{})
+		if _, filter := tb.GetFilter(); filter != want {
+			t.Fatalf("filter %q after backspace, want %q", filter, want)
+		}
+	}
+	Update(tb, press(tea.KeyBackspace, "", 0), image.Point{})
+	Update(tb, press('é', "é", 0), image.Point{})
+	Update(tb, press(tea.KeyBackspace, "", 0), image.Point{})
+	if column, filter := tb.GetFilter(); column != -1 || filter != "" {
+		t.Fatalf("filter %q on column %d after removing its only character, want none", filter, column)
+	}
+	// backspace without a filter, and a click on a table without rows, change nothing
+	Update(tb, press(tea.KeyBackspace, "", 0), image.Point{})
+	empty := table.NewTable(20, 5, []string{"A"})
+	Update(empty, tea.MouseClickMsg{X: 3, Y: 2, Button: tea.MouseLeft}, image.Point{})
+	Update(empty, tea.PasteMsg{Content: "x"}, image.Point{})
+	if x, y := empty.GetCursorLocation(); x != 0 || y != 0 {
+		t.Fatalf("cursor at %d:%d in a table without rows", x, y)
+	}
+}

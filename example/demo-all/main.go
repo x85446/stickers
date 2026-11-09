@@ -166,7 +166,7 @@ func underHeader(msg tea.Msg) tea.Msg {
 
 // demoSize is the window the current demo may draw in: everything under the header line.
 func (m *model) demoSize() tea.WindowSizeMsg {
-	return tea.WindowSizeMsg{Width: m.width, Height: m.height - 1}
+	return tea.WindowSizeMsg{Width: m.width, Height: max(m.height-1, 0)}
 }
 
 // updateSplash handles messages while the splash screen is showing.

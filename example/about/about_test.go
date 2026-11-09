@@ -34,3 +34,19 @@ func TestOverCutsABoxLargerThanTheArea(t *testing.T) {
 		}
 	}
 }
+
+// TestOverFillsTheAreaAndTakesAnySize: every line is the width of the area, also where
+// the content ends in blanks, and an area without room returns the content.
+func TestOverFillsTheAreaAndTakesAnySize(t *testing.T) {
+	content := strings.TrimSuffix(strings.Repeat("ab"+strings.Repeat(" ", 28)+"\n", 8), "\n")
+	for i, line := range strings.Split(Over(content, "hi", 30, 8), "\n") {
+		if w := lipgloss.Width(line); w != 30 {
+			t.Fatalf("line %d is %d columns wide, want 30", i, w)
+		}
+	}
+	for _, size := range [][2]int{{0, 5}, {5, 0}, {0, -1}, {-3, -3}} {
+		if got := Over("content", "hi", size[0], size[1]); got != "content" {
+			t.Errorf("an area of %dx%d changes the content to %q", size[0], size[1], got)
+		}
+	}
+}

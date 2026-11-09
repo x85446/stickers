@@ -186,3 +186,19 @@ func TestClickSelectsATableRowUnderTheHeader(t *testing.T) {
 		t.Fatalf("a click on the table's header did not sort: %q", screen(m)[1])
 	}
 }
+
+// TestAboutBeforeTheFirstWindowSize: the about box of a demo shows, or does not, without
+// a panic while the program has no window size yet.
+func TestAboutBeforeTheFirstWindowSize(t *testing.T) {
+	m := newModel()
+	m = press(t, m, keySpace)
+	for range m.demos {
+		m = press(t, m, tea.KeyPressMsg{Code: 'a', Text: "a"})
+		m.View()
+		m = press(t, m, tea.KeyPressMsg{Code: 'a', Text: "a"})
+		m = press(t, m, keyTab)
+	}
+	m = press(t, m, tea.WindowSizeMsg{Width: 1, Height: 1})
+	m = press(t, m, tea.KeyPressMsg{Code: 'a', Text: "a"})
+	m.View()
+}

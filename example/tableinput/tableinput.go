@@ -6,6 +6,7 @@ import (
 	"image"
 	"strings"
 	"unicode"
+	"unicode/utf8"
 
 	tea "charm.land/bubbletea/v2"
 	"github.com/x85446/stickers/v2/table"
@@ -60,8 +61,10 @@ func key(t *table.Table, msg tea.KeyPressMsg) bool {
 		x, _ := t.GetCursorLocation()
 		SortBy(t, x)
 	case "backspace":
-		if column, filter := t.GetFilter(); len(filter) > 1 {
-			t.SetFilter(column, filter[:len(filter)-1])
+		// the filter loses its last character, which can be more than a byte
+		if column, filter := t.GetFilter(); utf8.RuneCountInString(filter) > 1 {
+			_, size := utf8.DecodeLastRuneInString(filter)
+			t.SetFilter(column, filter[:len(filter)-size])
 		} else {
 			t.UnsetFilter()
 		}
@@ -88,13 +91,9 @@ func SortBy(t *table.Table, column int) {
 // click moves the cursor to the cell at column x and line y of the rendered table, or
 // sorts by the column of a header at line 0.
 func click(t *table.Table, x, y int) {
-	column, ok := t.ColumnAt(x)
-	if !ok {
-		return
-	}
-	if row, ok := t.RowAt(y); ok {
+	if column, row, ok := t.CellAt(x, y); ok {
 		t.SetCursorLocation(column, row)
-	} else if y == 0 {
+	} else if column, ok := t.ColumnAt(x); ok && y == 0 {
 		SortBy(t, column)
 	}
 }

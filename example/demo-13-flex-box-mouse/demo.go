@@ -137,10 +137,10 @@ func (m *Model) View() tea.View {
 	view.AltScreen = true
 	view.MouseMode = tea.MouseModeCellMotion
 	view.WindowTitle = "Stickers: Mouse and Cursor"
-	if !m.showAbout {
-		// the cursor goes where the selected cell's content starts
-		origin := m.cells[m.selected].GetContentBounds().Min
-		view.Cursor = tea.NewCursor(origin.X, origin.Y)
+	// the cursor goes where the selected cell's content starts, when the cell has room
+	// for content
+	if content := m.cells[m.selected].GetContentBounds(); !m.showAbout && !content.Empty() {
+		view.Cursor = tea.NewCursor(content.Min.X, content.Min.Y)
 	}
 	return view
 }
