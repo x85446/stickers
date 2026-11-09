@@ -3,279 +3,242 @@ package flexbox
 import "github.com/charmbracelet/lipgloss"
 
 // HorizontalFlexBox is a responsive grid of columns, each holding cells stacked
-// vertically. Columns sit side by side and share the box width by ratio.
+// vertically. Columns sit side by side and share the box width by ratio or fixed size.
+//
+// A HorizontalFlexBox is not safe for concurrent use.
 type HorizontalFlexBox struct {
-	// style to apply to the gridbox itself
-	style         lipgloss.Style
-	styleAncestor bool
-
-	// width is fixed width of the box
-	width int
-	// height is fixed height of the box
-	height int
-
-	// fixedColumnWidth will lock column width to a number, this disabless responsivness
-	fixedColumnWidth int
-
+	style   styling
 	columns []*Column
 
-	// recalculateFlag indicates if next render should make calculations regarding
-	// the columns objects height
-	recalculateFlag bool
-
-	// columnAlign places the columns inside the box when together they are narrower than it
+	width, height int
+	// fixedColumnWidth pins every column to a width when greater than 0
+	fixedColumnWidth int
+	// columnAlign places the columns when together they are narrower than the box
 	columnAlign lipgloss.Position
+
+	// out is the last render, key and revs what it was rendered from
+	out      string
+	key      containerKey
+	revs     []uint64
+	rendered bool
+
+	// tracks, parts and frame are reused between renders
+	tracks []track
+	parts  []*block
+	frame  block
 }
 
 // NewHorizontal initializes a HorizontalFlexBox of the given size with no columns and an
 // empty style.
 func NewHorizontal(width, height int) *HorizontalFlexBox {
-	r := &HorizontalFlexBox{
-		width:            width,
-		height:           height,
-		fixedColumnWidth: -1,
-		style:            lipgloss.NewStyle(),
-		recalculateFlag:  false,
-		columnAlign:      lipgloss.Left,
+	return &HorizontalFlexBox{
+		style:       styling{own: lipgloss.NewStyle()},
+		width:       width,
+		height:      height,
+		columnAlign: lipgloss.Left,
 	}
-	return r
 }
 
 // SetColumnAlign places the columns inside the box when together they are narrower than
-// it, such as columns of a locked width, at lipgloss.Left, lipgloss.Center or
+// it, such as columns of a fixed width, at lipgloss.Left, lipgloss.Center or
 // lipgloss.Right. The default is lipgloss.Left.
-func (r *HorizontalFlexBox) SetColumnAlign(align lipgloss.Position) *HorizontalFlexBox {
-	r.columnAlign = align
-	return r
+func (b *HorizontalFlexBox) SetColumnAlign(align lipgloss.Position) *HorizontalFlexBox {
+	b.columnAlign = align
+	return b
 }
 
 // SetStyle replaces the style. Width and height keys are removed because the box's size
 // is set with SetWidth and SetHeight. A border, padding or margin shrinks the area the
 // columns share.
-func (r *HorizontalFlexBox) SetStyle(style lipgloss.Style) *HorizontalFlexBox {
-	r.style = style.
-		UnsetWidth().
-		UnsetMaxWidth().
-		UnsetHeight().
-		UnsetMaxHeight()
-	return r
+func (b *HorizontalFlexBox) SetStyle(style lipgloss.Style) *HorizontalFlexBox {
+	b.style.set(style)
+	return b
 }
 
 // StylePassing sets whether the box's style is passed to its columns. A column passes it
 // on to its cells only when its own StylePassing is enabled.
-func (r *HorizontalFlexBox) StylePassing(value bool) *HorizontalFlexBox {
-	r.styleAncestor = value
-	return r
+func (b *HorizontalFlexBox) StylePassing(value bool) *HorizontalFlexBox {
+	b.style.passing = value
+	return b
 }
 
 // UseStyle sets the style and enables StylePassing in one call.
-func (r *HorizontalFlexBox) UseStyle(style lipgloss.Style) *HorizontalFlexBox {
-	r.SetStyle(style)
-	r.StylePassing(true)
-	return r
+func (b *HorizontalFlexBox) UseStyle(style lipgloss.Style) *HorizontalFlexBox {
+	return b.SetStyle(style).StylePassing(true)
 }
 
 // NewColumn initializes an empty Column. Add it with AddColumns or SetColumns.
-func (r *HorizontalFlexBox) NewColumn() *Column {
-	rw := &Column{
-		cells: []*Cell{},
-		width: r.width,
-		style: lipgloss.NewStyle(),
-	}
-	return rw
+func (b *HorizontalFlexBox) NewColumn() *Column {
+	return &Column{style: styling{own: lipgloss.NewStyle()}}
 }
 
-// AddColumns appends columns to the box.
-func (r *HorizontalFlexBox) AddColumns(columns []*Column) *HorizontalFlexBox {
-	r.columns = append(r.columns, columns...)
-	r.setRecalculate()
-	return r
+// AddColumns appends columns to the box. A nil column is left out.
+func (b *HorizontalFlexBox) AddColumns(columns []*Column) *HorizontalFlexBox {
+	b.columns = appendElements(b.columns, columns)
+	return b
 }
 
-// SetColumns replaces all columns of the box.
-func (r *HorizontalFlexBox) SetColumns(columns []*Column) *HorizontalFlexBox {
-	r.columns = columns
-	r.setRecalculate()
-	return r
+// SetColumns replaces all columns of the box. A nil column is left out. The box keeps
+// its own list, so later changes to the slice do not reach it.
+func (b *HorizontalFlexBox) SetColumns(columns []*Column) *HorizontalFlexBox {
+	b.columns = replaceElements(b.columns, columns)
+	return b
 }
 
 // ColumnsLen returns the number of columns.
-func (r *HorizontalFlexBox) ColumnsLen() int {
-	return len(r.columns)
+func (b *HorizontalFlexBox) ColumnsLen() int {
+	return len(b.columns)
 }
 
-// GetColumn returns the column at the index, or nil. The box recalculates on its next
-// render.
-func (r *HorizontalFlexBox) GetColumn(index int) *Column {
-	if index >= 0 && index < len(r.columns) {
-		r.setRecalculate()
-		return r.columns[index]
+// GetColumn returns the column at the index, or nil.
+func (b *HorizontalFlexBox) GetColumn(index int) *Column {
+	if index >= 0 && index < len(b.columns) {
+		return b.columns[index]
 	}
 	return nil
 }
 
 // GetColumnCopy returns a copy of the column at the index, with copies of its cells, or
-// nil. Reading the copy does not trigger a recalculation.
-func (r *HorizontalFlexBox) GetColumnCopy(index int) *Column {
-	if index >= 0 && index < len(r.columns) {
-		columnCopy := r.columns[index].copy()
+// nil. Changes to the copy do not reach the box.
+func (b *HorizontalFlexBox) GetColumnCopy(index int) *Column {
+	if index >= 0 && index < len(b.columns) {
+		columnCopy := b.columns[index].copy()
 		return &columnCopy
 	}
 	return nil
 }
 
 // GetColumnCellCopy returns a copy of the cell at cellIndex in the column at
-// columnIndex, or nil. Reading the copy does not trigger a recalculation.
-func (r *HorizontalFlexBox) GetColumnCellCopy(columnIndex, cellIndex int) *Cell {
-	if columnIndex >= 0 && columnIndex < len(r.columns) {
-		if cellIndex >= 0 && cellIndex < len(r.columns[columnIndex].cells) {
-			cellCopy := r.columns[columnIndex].cells[cellIndex].copy()
-			return &cellCopy
-		}
+// columnIndex, or nil. Changes to the copy do not reach the box.
+func (b *HorizontalFlexBox) GetColumnCellCopy(columnIndex, cellIndex int) *Cell {
+	if column := b.GetColumn(columnIndex); column != nil {
+		return column.GetCellCopy(cellIndex)
 	}
 	return nil
 }
 
-// UpdateColumn replaces the column at the index. The index must exist.
-func (r *HorizontalFlexBox) UpdateColumn(index int, column *Column) *HorizontalFlexBox {
-	r.columns[index] = column
-	r.setRecalculate()
-	return r
+// UpdateColumn replaces the column at the index. An index out of range or a nil column
+// changes nothing.
+func (b *HorizontalFlexBox) UpdateColumn(index int, column *Column) *HorizontalFlexBox {
+	if column != nil && index >= 0 && index < len(b.columns) {
+		b.columns[index] = column
+	}
+	return b
 }
 
 // LockColumnWidth pins every column to the given number of columns, which disables
 // horizontal scaling. A value of 0 or less restores ratio sizing.
-func (r *HorizontalFlexBox) LockColumnWidth(value int) *HorizontalFlexBox {
-	r.fixedColumnWidth = value
-	return r
+func (b *HorizontalFlexBox) LockColumnWidth(value int) *HorizontalFlexBox {
+	b.fixedColumnWidth = value
+	return b
 }
 
 // SetHeight sets the box height, which every column gets in full.
-func (r *HorizontalFlexBox) SetHeight(value int) *HorizontalFlexBox {
-	r.height = value
-	for _, column := range r.columns {
-		column.setHeight(value)
-	}
-	return r
+func (b *HorizontalFlexBox) SetHeight(value int) *HorizontalFlexBox {
+	b.height = value
+	return b
 }
 
-// SetWidth sets the box width, the columns its columns share.
-func (r *HorizontalFlexBox) SetWidth(value int) *HorizontalFlexBox {
-	r.width = value
-	r.setRecalculate()
-	return r
+// SetWidth sets the box width, which its columns share.
+func (b *HorizontalFlexBox) SetWidth(value int) *HorizontalFlexBox {
+	b.width = value
+	return b
 }
 
 // GetHeight returns the box height.
-func (r *HorizontalFlexBox) GetHeight() int {
-	return r.getMaxHeight()
+func (b *HorizontalFlexBox) GetHeight() int {
+	return b.height
 }
 
 // GetWidth returns the box width.
-func (r *HorizontalFlexBox) GetWidth() int {
-	return r.getMaxWidth()
+func (b *HorizontalFlexBox) GetWidth() int {
+	return b.width
 }
 
-// Render lays out the columns if anything changed since the last render, renders each
-// column, joins them horizontally, places them with the column alignment, and wraps the
-// result in the box's own style.
-func (r *HorizontalFlexBox) Render() string {
-	var inheritedStyle []lipgloss.Style
-	if r.styleAncestor {
-		inheritedStyle = append(inheritedStyle, r.style)
-	}
+// Render lays out the grid and returns it as exactly GetHeight lines of GetWidth columns.
+// Only what changed since the last render is rendered again: a cell when its size, style
+// or content changed, a column when one of its cells did. An unchanged grid costs a call
+// to each content generator.
+//
+// Text styled by an earlier render is reused as it is. After changing how lipgloss
+// renders a style at run time, such as the color profile, set the styles again.
+func (b *HorizontalFlexBox) Render() string {
+	b.layout()
 
-	r.recalculate()
-	var renderedColumns []string
-	for _, column := range r.columns {
-		renderedColumns = append(renderedColumns, column.render(inheritedStyle...))
-	}
-	joined := lipgloss.PlaceHorizontal(r.getContentWidth(), r.columnAlign,
-		lipgloss.JoinHorizontal(lipgloss.Top, renderedColumns...))
-	return r.style.
-		Width(r.getContentWidth()).MaxWidth(r.getMaxWidth()).
-		Height(r.getContentHeight()).MaxHeight(r.getMaxHeight()).
-		Render(joined)
-}
-
-// ForceRecalculate lays out the box and every column now instead of at the next render.
-func (r *HorizontalFlexBox) ForceRecalculate() {
-	r.recalculate()
-	for _, rw := range r.columns {
-		rw.recalculate()
-	}
-}
-
-// recalculate fetches the column height distribution slice and sets it on the columns
-func (r *HorizontalFlexBox) recalculate() {
-	if r.recalculateFlag {
-		if len(r.columns) > 0 {
-			r.distributeColumnsDimensions(r.calculateColumnWidth())
+	key := containerKey{width: max(b.width, 0), height: max(b.height, 0), style: b.style.id, align: b.columnAlign}
+	stale := !b.rendered || key != b.key || len(b.revs) != len(b.columns)
+	b.revs, b.parts = resize(b.revs, len(b.columns)), b.parts[:0]
+	passed := b.style.passed()
+	for i, column := range b.columns {
+		part := column.render(passed)
+		if part.rev != b.revs[i] {
+			b.revs[i], stale = part.rev, true
 		}
-		r.unsetRecalculate()
+		b.parts = append(b.parts, part)
+	}
+	if !stale {
+		return b.out
+	}
+	b.key, b.rendered = key, true
+
+	// Columns that leave spare room are placed in it; columns wider than the box are
+	// cut at its edge.
+	width, height := b.contentSize()
+	left, right := 0, width
+	for _, part := range b.parts {
+		right -= part.width
+	}
+	if right > 0 {
+		left = right - offset(right, 1-b.columnAlign)
+		right -= left
+	}
+	b.frame.join(b.parts, height, left, max(right, 0))
+	b.frame.clip(width)
+	if !b.style.plain() {
+		f := b.style.frame
+		style := b.style.effective.
+			Width(key.width - f.edgeX).MaxWidth(key.width).
+			Height(key.height - f.edgeY())
+		text := renderStyled(style, b.frame.String())
+		b.frame.fill(text, key.width, key.height, f.top, f.bottom)
+	}
+	b.out = b.frame.String()
+	return b.out
+}
+
+// ForceRecalculate lays out the box and every column now, so the sizes of columns and
+// cells can be read before the next render.
+func (b *HorizontalFlexBox) ForceRecalculate() {
+	b.layout()
+	passed := b.style.passed()
+	for _, column := range b.columns {
+		column.layout(passed)
 	}
 }
 
-func (r *HorizontalFlexBox) setRecalculate() {
-	r.recalculateFlag = true
+// contentSize returns the area the columns share, inside the box's frame.
+func (b *HorizontalFlexBox) contentSize() (width, height int) {
+	f := b.style.frame
+	return max(b.width-f.edgeX-f.paddingX, 0), max(b.height-f.edgeY()-f.paddingY, 0)
 }
 
-func (r *HorizontalFlexBox) unsetRecalculate() {
-	r.recalculateFlag = false
-}
+// layout sizes the columns. Every column takes the content height, and the columns
+// share the content width as tracks.
+func (b *HorizontalFlexBox) layout() {
+	b.style.resolve(inherited{})
+	width, height := b.contentSize()
 
-// calculateColumnWidth calculates the width of each column and returns the distribution array
-func (r *HorizontalFlexBox) calculateColumnWidth() (distribution []int) {
-	if r.fixedColumnWidth > 0 {
-		var fixedColumns []int
-		for range r.columns {
-			fixedColumns = append(fixedColumns, r.fixedColumnWidth)
+	tracks := b.tracks[:0]
+	for _, column := range b.columns {
+		t := column.track()
+		if b.fixedColumnWidth > 0 {
+			t.fixed = b.fixedColumnWidth
 		}
-		return fixedColumns
+		tracks = append(tracks, t)
 	}
-	return calculateMatrixRatio(r.getContentWidth(), r.getColumnMatrix())
-}
-
-// distributeColumnsDimensions sets height and width of each column per distribution array
-func (r *HorizontalFlexBox) distributeColumnsDimensions(ratioDistribution []int) {
-	for index, column := range r.columns {
-		column.setHeight(r.getContentHeight())
-		column.setWidth(ratioDistribution[index])
+	distribute(tracks, width)
+	for i, column := range b.columns {
+		column.width, column.height = tracks[i].size, height
 	}
-}
-
-// getColumnMatrix return the matrix of the cell widths for all the columns
-func (r *HorizontalFlexBox) getColumnMatrix() (columnMatrix [][]int) {
-	for _, column := range r.columns {
-		var cellValues []int
-		for _, cell := range column.cells {
-			cellValues = append(cellValues, cell.ratioX)
-		}
-		columnMatrix = append(columnMatrix, cellValues)
-	}
-	return columnMatrix
-}
-
-func (r *HorizontalFlexBox) getContentWidth() int {
-	return r.getMaxWidth() - r.getExtraWidth()
-}
-
-func (r *HorizontalFlexBox) getContentHeight() int {
-	return r.getMaxHeight() - r.getExtraHeight()
-}
-
-func (r *HorizontalFlexBox) getMaxWidth() int {
-	return r.width
-}
-
-func (r *HorizontalFlexBox) getMaxHeight() int {
-	return r.height
-}
-
-func (r *HorizontalFlexBox) getExtraWidth() int {
-	return r.style.GetHorizontalFrameSize()
-}
-
-func (r *HorizontalFlexBox) getExtraHeight() int {
-	return r.style.GetVerticalFrameSize()
+	b.tracks = tracks
 }

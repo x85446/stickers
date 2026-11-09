@@ -12,7 +12,7 @@ func bordered() lipgloss.Style { return lipgloss.NewStyle().Border(lipgloss.Norm
 // renderAt renders a cell at the given size and returns its lines.
 func renderAt(c *Cell, width, height int) []string {
 	c.width, c.height = width, height
-	return strings.Split(c.render(), "\n")
+	return c.render(inherited{}).lines
 }
 
 func assertLines(t *testing.T, got []string, want ...string) {
@@ -39,6 +39,40 @@ func TestCellRenderKeepsTrailingSpacesOnLastLine(t *testing.T) {
 		"   b      ")
 }
 
+// TestCellContentAlignsVertically: the content sits where the style's vertical alignment
+// puts it, also when its last line ends in a space, which centers one column further
+// left.
+func TestCellContentAlignsVertically(t *testing.T) {
+	for _, tc := range []struct {
+		pos     lipgloss.Position
+		content string
+		want    []string
+	}{
+		{lipgloss.Top, "x", []string{"  x  ", "     ", "     "}},
+		{lipgloss.Center, "x", []string{"     ", "  x  ", "     "}},
+		{lipgloss.Bottom, "x", []string{"     ", "     ", "  x  "}},
+		{lipgloss.Top, "x ", []string{" x   ", "     ", "     "}},
+		{lipgloss.Center, "x ", []string{"     ", " x   ", "     "}},
+		{lipgloss.Bottom, "x ", []string{"     ", "     ", " x   "}},
+	} {
+		cell := NewCell(1, 1).SetStyle(lipgloss.NewStyle().Align(lipgloss.Center, tc.pos)).SetContent(tc.content)
+		assertLines(t, renderAt(cell, 5, 3), tc.want...)
+	}
+}
+
+func TestRenderStyledKeepsTrailingSpaces(t *testing.T) {
+	right := lipgloss.NewStyle().Width(6).Align(lipgloss.Right)
+	if got := renderStyled(right, "ab  "); got != "  ab  " {
+		t.Fatalf("rendered %q, want %q", got, "  ab  ")
+	}
+	if got := renderStyled(right, "ab"); got != "    ab" {
+		t.Fatalf("rendered %q, want %q", got, "    ab")
+	}
+	if got := renderStyled(right.Underline(true), "a "); strings.Contains(got, keeper) {
+		t.Fatalf("rendered %q, which still holds the marker", got)
+	}
+}
+
 func TestCellRenderClipsContentNotBorder(t *testing.T) {
 	cell := NewCell(1, 1).SetStyle(bordered()).SetContent("ab\ncd")
 	assertLines(t, renderAt(cell, 6, 3),
@@ -61,7 +95,10 @@ func TestCellRenderBelowFrameKeepsTop(t *testing.T) {
 
 func TestCellRenderZeroHeightHoldsWidth(t *testing.T) {
 	cell := NewCell(1, 1).SetStyle(bordered()).SetContent("ab")
-	assertLines(t, renderAt(cell, 5, 0), "     ")
+	cell.width, cell.height = 5, 0
+	if out := cell.render(inherited{}); len(out.lines) != 0 || out.width != 5 {
+		t.Fatalf("rendered %d lines of width %d, want no lines of width 5", len(out.lines), out.width)
+	}
 }
 
 func TestCellRenderZeroWidthHoldsHeight(t *testing.T) {
@@ -133,4 +170,78 @@ func TestColumnSkipsZeroHeightCells(t *testing.T) {
 	assertLines(t, strings.Split(box.Render(), "\n"),
 		"c  ",
 		"   ")
+}
+
+// plainAndStyled renders content in a cell with no style and in a cell with an empty
+// style set, which goes through lipgloss, and fails unless both show the same lines.
+func plainAndStyled(t *testing.T, content string, width, height int) []string {
+	t.Helper()
+	plain := renderAt(NewCell(1, 1).SetContent(content), width, height)
+	styled := renderAt(NewCell(1, 1).SetStyle(lipgloss.NewStyle()).SetContent(content), width, height)
+	if strings.Join(plain, "\n") != strings.Join(styled, "\n") {
+		t.Fatalf("content %q at %dx%d renders\n%q\nwithout a style and\n%q\nthrough lipgloss", content, width, height, plain, styled)
+	}
+	return plain
+}
+
+// TestCellWrapsLikeLipgloss: a cell breaks its content where lipgloss breaks it, with
+// and without a style, and loses no character at a break.
+func TestCellWrapsLikeLipgloss(t *testing.T) {
+	assertLines(t, plainAndStyled(t, " Configuration", 8, 3), "        ", "Configur", "ation   ")
+	assertLines(t, plainAndStyled(t, "山田太郎-san", 8, 3), "山田太郎", "-san    ", "        ")
+	assertLines(t, plainAndStyled(t, "cafe\u0301s", 4, 2), "cafe\u0301", "s   ")
+	assertLines(t, plainAndStyled(t, "abc\r\ndef", 10, 1), "abc       ")
+	assertLines(t, plainAndStyled(t, "abc\r\ndef", 10, 2), "abc       ", "def       ")
+	assertLines(t, plainAndStyled(t, "a\tb", 8, 1), "a    b  ")
+
+	contents := []string{
+		"", " ", "x", " lead", "trail ", "two  spaces", "a-hyphenated-word", "averyveryverylongword",
+		"one two three four five six", "line one\nline two\n\nline four", "  indented\n    more",
+		"東京tower", "日本語のテキスト", "mixed 日本語 and ascii", "e\u0301e\u0301e\u0301e\u0301e\u0301", "👾 invaders 👾👾",
+		"tab\there", "crlf\r\nline", "zero\u200bwidth",
+	}
+	for _, content := range contents {
+		for width := 1; width <= 12; width++ {
+			plainAndStyled(t, content, width, 4)
+		}
+	}
+}
+
+// TestFitContentBreaksWhereLipglossBreaks pins the wrap a cell counts its lines with to
+// the wrap inside lipgloss: both must break every content at the same places.
+func TestFitContentBreaksWhereLipglossBreaks(t *testing.T) {
+	trimmed := func(text string) string {
+		lines := strings.Split(text, "\n")
+		for i, line := range lines {
+			lines[i] = strings.TrimRight(line, " ")
+		}
+		return strings.Join(lines, "\n")
+	}
+	for _, content := range []string{
+		" Configuration", "山田太郎-san", "cafe\u0301s", "one two three four", "a-b-c-d-e-f-g", "longwordwithoutanybreak",
+		"  two leading", "x  y  z", "日本語 text 日本語", "👾👾👾👾",
+	} {
+		for width := 1; width <= 10; width++ {
+			want := trimmed(lipgloss.NewStyle().Width(width).Render(content))
+			if got := trimmed(fitContent(content, width, 99)); got != want {
+				t.Errorf("content %q at width %d breaks as\n%q\nlipgloss breaks it as\n%q", content, width, got, want)
+			}
+		}
+	}
+}
+
+// TestStyledContentInAPlainCellStaysInTheCell: escape sequences in the content are
+// closed at every line end, so a color never runs into the next cell.
+func TestStyledContentInAPlainCellStaysInTheCell(t *testing.T) {
+	useTrueColor(t)
+	red := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Render("long red text that wraps")
+	box := New(20, 3)
+	box.AddRows([]*Row{box.NewRow().AddCells(NewCell(1, 1).SetContent(red), NewCell(1, 1).SetContent("plain"))})
+	for i, line := range lines(box) {
+		resets := strings.Count(line, "\x1b[m") + strings.Count(line, "\x1b[0m")
+		if strings.Count(line, "\x1b[38") != resets {
+			t.Fatalf("line %d leaves a color open: %q", i, line)
+		}
+	}
+	plainAndStyled(t, red, 10, 3)
 }

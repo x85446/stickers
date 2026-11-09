@@ -1,259 +1,200 @@
 package flexbox
 
-import (
-	"strconv"
-
-	"github.com/charmbracelet/lipgloss"
-)
+import "github.com/charmbracelet/lipgloss"
 
 // Column holds the cells of one column of a HorizontalFlexBox. Its width comes from the
-// box; its cells' widths and heights come from their ratios. Columns sit side by side.
+// box; its cells' widths and heights come from their ratios and fixed sizes. Columns sit
+// side by side.
 type Column struct {
-	// style of the column
-	style         lipgloss.Style
-	styleAncestor bool
-
+	style styling
 	cells []*Cell
 
-	height int
-	width  int
+	// width and height are the size the last layout gave the column
+	width, height int
+	// fixedWidth replaces the ratio-based width when greater than 0
+	fixedWidth int
 
-	// recalculateFlag indicates if next render should make calculations regarding
-	// the cells objects height/width
-	recalculateFlag bool
+	// out is the last render, key and revs what it was rendered from
+	out      block
+	key      containerKey
+	revs     []uint64
+	rendered bool
+
+	// tracks and parts are reused between renders
+	tracks []track
+	parts  []*block
 }
 
-// AddCells appends cells to the column. A cell without an ID gets its index as its ID.
-func (r *Column) AddCells(cells ...*Cell) *Column {
-	r.cells = append(r.cells, cells...)
-	for i, cell := range r.cells {
-		if cell.id == "" {
-			cell.id = strconv.Itoa(i)
-		}
-	}
-	r.setRecalculate()
-	return r
+// AddCells appends cells to the column. A cell without an ID gets its index as its ID,
+// and a nil cell is left out.
+func (c *Column) AddCells(cells ...*Cell) *Column {
+	c.cells = appendCells(c.cells, cells)
+	return c
+}
+
+// SetFixedWidth gives the column a fixed width instead of a ratio-based one. A value of
+// 0 or less restores ratio sizing.
+func (c *Column) SetFixedWidth(value int) *Column {
+	c.fixedWidth = value
+	return c
 }
 
 // CellsLen returns the number of cells.
-func (r *Column) CellsLen() int {
-	return len(r.cells)
+func (c *Column) CellsLen() int {
+	return len(c.cells)
 }
 
-// GetCell returns the cell at the index, or nil. The column recalculates on its next
-// render.
-func (r *Column) GetCell(index int) *Cell {
-	if index >= 0 && index < len(r.cells) {
-		r.setRecalculate()
-		return r.cells[index]
+// GetCell returns the cell at the index, or nil.
+func (c *Column) GetCell(index int) *Cell {
+	if index >= 0 && index < len(c.cells) {
+		return c.cells[index]
 	}
 	return nil
 }
 
-// GetCellCopy returns a copy of the cell at the index, or nil. Reading the copy does not
-// trigger a recalculation.
-func (r *Column) GetCellCopy(index int) *Cell {
-	if index >= 0 && index < len(r.cells) {
-		c := r.cells[index].copy()
-		return &c
+// GetCellCopy returns a copy of the cell at the index, or nil. Changes to the copy do
+// not reach the column.
+func (c *Column) GetCellCopy(index int) *Cell {
+	if index >= 0 && index < len(c.cells) {
+		cellCopy := c.cells[index].copy()
+		return &cellCopy
 	}
 	return nil
 }
 
-// GetCellWithID returns the cell with the ID, or nil. The column recalculates on its
-// next render.
-func (r *Column) GetCellWithID(id string) *Cell {
-	for _, c := range r.cells {
-		if c.id == id {
-			r.setRecalculate()
-			return c
-		}
-	}
-	return nil
+// GetCellWithID returns the first cell with the ID, or nil.
+func (c *Column) GetCellWithID(id string) *Cell {
+	return cellWithID(c.cells, id)
 }
 
-// UpdateCellWithIndex replaces the cell at the index. An index out of range changes
-// nothing.
-func (r *Column) UpdateCellWithIndex(index int, cell *Cell) {
-	if index >= 0 && len(r.cells) > 0 && index < len(r.cells) {
-		r.cells[index] = cell
-		r.setRecalculate()
+// UpdateCellWithIndex replaces the cell at the index. An index out of range or a nil
+// cell changes nothing.
+func (c *Column) UpdateCellWithIndex(index int, cell *Cell) *Column {
+	if cell != nil && index >= 0 && index < len(c.cells) {
+		c.cells[index] = cell
+		c.cells = appendCells(c.cells[:0], c.cells)
 	}
+	return c
 }
 
 // SetStyle replaces the style. Width and height keys are removed because the box owns
 // the column's size. A border, padding or margin on the column shrinks the area its
 // cells share.
-func (r *Column) SetStyle(style lipgloss.Style) *Column {
-	r.style = style.
-		UnsetWidth().
-		UnsetMaxWidth().
-		UnsetHeight().
-		UnsetMaxHeight()
-
-	return r
+func (c *Column) SetStyle(style lipgloss.Style) *Column {
+	c.style.set(style)
+	return c
 }
 
 // StylePassing sets whether the column's style, including what it inherits from the
 // box, is passed to its cells.
-func (r *Column) StylePassing(value bool) *Column {
-	r.styleAncestor = value
-	return r
+func (c *Column) StylePassing(value bool) *Column {
+	c.style.passing = value
+	return c
 }
 
 // UseStyle sets the style and enables StylePassing in one call.
-func (r *Column) UseStyle(style lipgloss.Style) *Column {
-	r.SetStyle(style)
-	r.StylePassing(true)
-	return r
+func (c *Column) UseStyle(style lipgloss.Style) *Column {
+	return c.SetStyle(style).StylePassing(true)
 }
 
-func (r *Column) setHeight(value int) {
-	r.height = value
-	r.setRecalculate()
+// GetWidth returns the width the last layout gave the column, frame included.
+func (c *Column) GetWidth() int {
+	return c.width
 }
 
-func (r *Column) setWidth(value int) {
-	r.width = value
-	r.setRecalculate()
+// GetHeight returns the height the last layout gave the column, frame included.
+func (c *Column) GetHeight() int {
+	return c.height
 }
 
-func (r *Column) render(inherited ...lipgloss.Style) string {
-	var inheritedStyle []lipgloss.Style
-
-	for _, style := range inherited {
-		r.style = r.style.Inherit(style)
+// track returns how the column shares the width of its box: the largest ratioX, minimum
+// width and fixed width among its cells, and its own fixed width.
+func (c *Column) track() track {
+	t := track{fixed: c.fixedWidth}
+	for _, cell := range c.cells {
+		t.ratio = max(t.ratio, cell.ratioX)
+		t.minimum = max(t.minimum, cell.minWidth)
+		t.fixed = max(t.fixed, cell.fixedWidth)
 	}
+	return t
+}
 
-	// intentionally applied after column inherits the box style
-	if r.styleAncestor {
-		inheritedStyle = append(inheritedStyle, r.style)
+// contentSize returns the area the cells share, inside the column's frame.
+func (c *Column) contentSize() (width, height int) {
+	f := c.style.frame
+	return max(c.width-f.edgeX-f.paddingX, 0), max(c.height-f.edgeY()-f.paddingY, 0)
+}
+
+// layout sizes the cells for the column's size and the style resolved from the box.
+// Cells share the height as tracks; each cell's width is its ratioX share of the column,
+// the largest ratioX taking all of it.
+func (c *Column) layout(from inherited) {
+	c.style.resolve(from)
+	width, height := c.contentSize()
+
+	tracks, largest := c.tracks[:0], 0
+	for _, cell := range c.cells {
+		tracks = append(tracks, track{ratio: cell.ratioY, minimum: cell.minHeight, fixed: cell.fixedHeight})
+		largest = max(largest, cell.ratioX)
 	}
+	distribute(tracks, height)
+	for i, cell := range c.cells {
+		cell.width, cell.height = scale(cell.ratioX, largest, width), tracks[i].size
+	}
+	c.tracks = tracks
+}
 
-	r.recalculate()
-	var renderedCells []string
-	for _, cell := range r.cells {
-		// a cell with no lines takes no room in the column
-		if cell.getMaxHeight() <= 0 {
-			continue
+// render returns the column as a block of exactly its width by its height, building it
+// only when its size, its style or one of its cells changed since the last render.
+//
+// The cells are stacked, left edges aligned. A cell without lines takes no room, and
+// anything taller than the column is cut at the column's bottom edge.
+func (c *Column) render(from inherited) *block {
+	c.layout(from)
+
+	key := containerKey{width: max(c.width, 0), height: max(c.height, 0), style: c.style.id}
+	stale := !c.rendered || key != c.key || len(c.revs) != len(c.cells)
+	c.revs, c.parts = resize(c.revs, len(c.cells)), c.parts[:0]
+	passed := c.style.passed()
+	for i, cell := range c.cells {
+		part := cell.render(passed)
+		if part.rev != c.revs[i] {
+			c.revs[i], stale = part.rev, true
 		}
-		renderedCells = append(renderedCells, cell.render(inheritedStyle...))
+		c.parts = append(c.parts, part)
 	}
-	return r.style.
-		Width(r.getContentWidth()).MaxWidth(r.getMaxWidth()).
-		Height(r.getContentHeight()).MaxHeight(r.getMaxHeight()).
-		Render(lipgloss.JoinVertical(lipgloss.Left, renderedCells...))
-}
-
-func (r *Column) setRecalculate() {
-	r.recalculateFlag = true
-}
-
-func (r *Column) unsetRecalculate() {
-	r.recalculateFlag = false
-}
-
-// recalculate fetches the cell's height/width distribution slices and sets it on the cells
-func (r *Column) recalculate() {
-	if r.recalculateFlag {
-		if len(r.cells) > 0 {
-			r.distributeCellDimensions(r.calculateCellsDimensions())
-		}
-		r.unsetRecalculate()
+	if !stale {
+		return &c.out
 	}
-}
+	c.key, c.rendered = key, true
 
-// distributeCellDimensions sets width of each column per distribution array
-func (r *Column) distributeCellDimensions(xMatrix, yMatrix []int) {
-	for index, y := range yMatrix {
-		r.cells[index].width = xMatrix[index]
-		r.cells[index].height = y
+	if key.width == 0 || key.height == 0 {
+		c.out.collapse(key.width, key.height)
+		return &c.out
 	}
-}
-
-// calculateCellsDimensions calculates the height and width of the each cell
-func (r *Column) calculateCellsDimensions() (xMatrix, yMatrix []int) {
-	// calculate the cell height, it uses fixed combined ratio since the height of each cell
-	// is individual and does not stack, column width will be calculated using the ratio of the
-	// widest cell in the slice
-	cellXMatrix, cellXMatrixMax := r.getCellWidthMatrix()
-
-	// reminder not needed here due to how combined ratio is passed
-	xMatrix, _ = distributeToMatrix(r.getContentWidth(), cellXMatrixMax, cellXMatrix)
-
-	// get the min height matrix of the cells if any
-	withMinHeight := false
-	var minHeightMatrix []int
-	for _, c := range r.cells {
-		minHeightMatrix = append(minHeightMatrix, c.minHeight)
-		if c.minHeight > 0 {
-			withMinHeight = true
-		}
+	width, height := c.contentSize()
+	if c.style.plain() {
+		c.out.stack(c.parts, width, width, lipgloss.Left, height)
+		c.out.extend(height)
+		return &c.out
 	}
-
-	// calculate the cell height matrix
-	if withMinHeight {
-		yMatrix = calculateRatioWithMinimum(r.getContentHeight(), r.getCellHeightMatrix(), minHeightMatrix)
-	} else {
-		yMatrix = calculateRatio(r.getContentHeight(), r.getCellHeightMatrix())
-	}
-
-	return xMatrix, yMatrix
+	group := widest(c.parts)
+	c.out.stack(c.parts, group, group, lipgloss.Left, height)
+	f := c.style.frame
+	style := c.style.effective.
+		Width(key.width - f.edgeX).MaxWidth(key.width).
+		Height(key.height - f.edgeY())
+	text := renderStyled(style, c.out.String())
+	c.out.fill(text, key.width, key.height, f.top, f.bottom)
+	return &c.out
 }
 
-// getCellHeightMatrix return the matrix of the cell height in cells
-func (r *Column) getCellHeightMatrix() (cellHeightMatrix []int) {
-	for _, cell := range r.cells {
-		cellHeightMatrix = append(cellHeightMatrix, cell.ratioY)
-	}
-	return cellHeightMatrix
-}
-
-// getCellWidthMatrix return the matrix of the cell width in cells and the max value in it
-func (r *Column) getCellWidthMatrix() (cellWidthMatrix []int, max int) {
-	max = 0
-	for _, cell := range r.cells {
-		if cell.ratioX > max {
-			max = cell.ratioX
-		}
-		cellWidthMatrix = append(cellWidthMatrix, cell.ratioX)
-	}
-	return cellWidthMatrix, max
-}
-
-func (r *Column) getContentWidth() int {
-	return r.getMaxWidth() - r.getExtraWidth()
-}
-
-func (r *Column) getContentHeight() int {
-	return r.getMaxHeight() - r.getExtraHeight()
-}
-
-func (r *Column) getMaxWidth() int {
-	return r.width
-}
-
-func (r *Column) getMaxHeight() int {
-	return r.height
-}
-
-func (r *Column) getExtraWidth() int {
-	return r.style.GetHorizontalFrameSize()
-}
-
-func (r *Column) getExtraHeight() int {
-	return r.style.GetVerticalFrameSize()
-}
-
-func (r *Column) copy() Column {
-	var cells []*Cell
-	for _, cell := range r.cells {
-		cellCopy := cell.copy()
-		cells = append(cells, &cellCopy)
-	}
-	columnCopy := *r
-	columnCopy.cells = cells
-	columnCopy.style = r.style
-
+// copy returns a copy of the column, with copies of its cells, that shares no render
+// state with it.
+func (c *Column) copy() Column {
+	columnCopy := *c
+	columnCopy.cells = copyCells(c.cells)
+	columnCopy.out, columnCopy.rendered = block{}, false
+	columnCopy.revs, columnCopy.tracks, columnCopy.parts = nil, nil, nil
 	return columnCopy
 }

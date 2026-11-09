@@ -15,31 +15,48 @@
 //	})
 //	s := box.Render()
 //
+// Every setter returns its receiver, so calls chain, and takes effect on the next Render.
+//
 // # Sizing
 //
-// Rows with a fixed height take it; the remaining lines are split between the other rows
-// in proportion to each row's largest cell ratioY, leftover lines going one each to the
-// rows with the largest ratios. Inside a row, fixed-width cells take their columns and
-// the rest are split by ratioX, honoring SetMinWidth. Each cell is ratioY/maxRatioY of
-// the row height, rounded down, and sits at the top of the row.
+// Rows share the height of a FlexBox, and the cells of a row share its width, the same
+// way. Fixed sizes are taken first. What is left is split in proportion to the ratios,
+// each share rounded down and the leftover going one unit each to the largest ratios. A
+// share under its minimum takes the minimum and the others split the rest. When the
+// fixed sizes leave nothing, the ratio-sized entries get their minimum, or nothing
+// without one.
 //
-// In a HorizontalFlexBox, column widths follow each column's largest cell ratioX, cell
-// heights inside a column are split by ratioY honoring SetMinHeight, and each cell is
-// ratioX/maxRatioX of the column width. SetFixedWidth, SetFixedHeight and SetMinWidth
-// apply to cells of a FlexBox only; SetMinHeight applies to cells of a
-// HorizontalFlexBox only.
+// A cell's ratioX, SetFixedWidth and SetMinWidth size it along its row. Across the row,
+// each cell is ratioY/maxRatioY of the row height, rounded down, and sits at the top;
+// the largest ratioY, SetFixedHeight and SetMinHeight among the cells size the row
+// itself, as Row.SetFixedHeight does.
+//
+// A HorizontalFlexBox is the mirror image. Columns share the width of the box and the
+// cells of a column share its height: ratioY, SetFixedHeight and SetMinHeight size a
+// cell along its column, each cell is ratioX/maxRatioX of the column width, and the
+// largest ratioX, SetFixedWidth and SetMinWidth among the cells size the column, as
+// Column.SetFixedWidth does.
 //
 // # Rendering
+//
+// Render returns exactly the box's height in lines, each the box's width in columns.
 //
 // A cell renders its frame first and its content second. The border and margins render
 // complete whenever the cell has room for them; content is wrapped at the content width
 // and clipped to the lines between the paddings, so content taller than the cell loses
-// its bottom lines, never the border. A cell with zero lines renders as a blank line of
-// its width in a row and takes no room in a column; a cell with zero columns adds
-// nothing to a row. A row never wraps its cells: anything wider than the row is cut at
-// the row's edge, and a row narrower than the box keeps its width so SetRowAlign can
-// place it. Columns that together are narrower than a HorizontalFlexBox are placed by
-// SetColumnAlign.
+// its bottom lines, never the border. A row or cell without lines takes no lines, and a
+// cell or column without columns takes no columns. A row never wraps its cells: anything
+// wider than the row is cut at the row's edge, and a row narrower than the box keeps its
+// width so SetRowAlign can place it. Columns that together are narrower than a
+// HorizontalFlexBox are placed by SetColumnAlign, and cut at its edge when they are
+// wider.
+//
+// Render lays out the grid every time and renders again only what changed since the
+// last call: a cell when its size, style or content changed, a row or column when one
+// of its cells did, the box when one of its rows or columns did. A content generator
+// runs on every render, so content that reads outside state is always current. Text
+// styled by an earlier render is reused as it is: after changing how lipgloss renders a
+// style at run time, such as the color profile, set the styles again.
 //
 // # Styles
 //
@@ -50,7 +67,25 @@
 //
 // # Reading the grid
 //
-// GetRow, GetCell and GetCellWithID return pointers and mark the layout for
-// recalculation on the next render. GetRowCopy, GetRowCellCopy and GetCellCopy return
-// copies and leave the layout alone.
+// GetRow, GetColumn, GetCell and GetCellWithID return the elements themselves; a change
+// to one shows on the next render. GetRowCopy, GetRowCellCopy, GetColumnCopy,
+// GetColumnCellCopy and GetCellCopy return copies that leave the grid alone. Sizes are
+// computed by Render, or by ForceRecalculate when they are needed before it.
+//
+// Add each row, column and cell in one place: one that sits in two places has one size,
+// the size of its last place. A nil row, column or cell is left out wherever one is
+// added or set.
+//
+// # Nesting
+//
+// A content generator receives the area inside the cell's border and margins. A box, a
+// table or any other component nests in a cell by taking that size and rendering:
+//
+//	cell.SetContentGenerator(func(width, height int) string {
+//		return inner.SetWidth(width).SetHeight(height).Render()
+//	})
+//
+// # Concurrency
+//
+// A box, its rows, columns and cells are not safe for concurrent use.
 package flexbox

@@ -4,319 +4,256 @@ import "github.com/charmbracelet/lipgloss"
 
 // FlexBox is a responsive grid of rows, each holding cells side by side. Rows stack
 // vertically and share the box height by ratio or fixed size.
+//
+// A FlexBox is not safe for concurrent use.
 type FlexBox struct {
-	// style to apply to the gridbox itself
-	style         lipgloss.Style
-	styleAncestor bool
+	style styling
+	rows  []*Row
 
-	// width is fixed width of the box
-	width int
-	// height is fixed height of the box
-	height int
-	// fixedRowHeight will lock row height to a number, this disabless responsivness
+	width, height int
+	// fixedRowHeight pins every row to a height when greater than 0
 	fixedRowHeight int
-
-	rows []*Row
-
-	// recalculateFlag indicates if next render should make calculations regarding
-	// the rows objects height
-	recalculateFlag bool
-
-	// rowAlign controls horizontal alignment when joining rows of varying width
-	// Default: lipgloss.Left (for backwards compatibility)
+	// rowAlign places rows narrower than the widest row
 	rowAlign lipgloss.Position
+
+	// out is the last render, key and revs what it was rendered from
+	out      string
+	key      containerKey
+	revs     []uint64
+	rendered bool
+
+	// tracks, parts and frame are reused between renders
+	tracks []track
+	parts  []*block
+	frame  block
 }
 
 // New initializes a FlexBox of the given size with no rows and an empty style.
 func New(width, height int) *FlexBox {
-	r := &FlexBox{
-		width:           width,
-		height:          height,
-		fixedRowHeight:  -1,
-		style:           lipgloss.NewStyle(),
-		recalculateFlag: false,
-		rowAlign:        lipgloss.Left,
+	return &FlexBox{
+		style:    styling{own: lipgloss.NewStyle()},
+		width:    width,
+		height:   height,
+		rowAlign: lipgloss.Left,
 	}
-	return r
 }
 
 // SetStyle replaces the style. Width and height keys are removed because the box's size
 // is set with SetWidth and SetHeight. A border, padding or margin shrinks the area the
 // rows share.
-func (r *FlexBox) SetStyle(style lipgloss.Style) *FlexBox {
-	r.style = style.
-		UnsetWidth().
-		UnsetMaxWidth().
-		UnsetHeight().
-		UnsetMaxHeight()
-	return r
+func (b *FlexBox) SetStyle(style lipgloss.Style) *FlexBox {
+	b.style.set(style)
+	return b
 }
 
 // StylePassing sets whether the box's style is passed to its rows. A row passes it on to
 // its cells only when its own StylePassing is enabled.
-func (r *FlexBox) StylePassing(value bool) *FlexBox {
-	r.styleAncestor = value
-	return r
+func (b *FlexBox) StylePassing(value bool) *FlexBox {
+	b.style.passing = value
+	return b
 }
 
 // UseStyle sets the style and enables StylePassing in one call.
-func (r *FlexBox) UseStyle(style lipgloss.Style) *FlexBox {
-	r.SetStyle(style)
-	r.StylePassing(true)
-	return r
+func (b *FlexBox) UseStyle(style lipgloss.Style) *FlexBox {
+	return b.SetStyle(style).StylePassing(true)
 }
 
-// SetRowAlign places rows narrower than the box, such as rows of fixed-width cells, at
-// lipgloss.Left, lipgloss.Center or lipgloss.Right. Full-width rows are unaffected. The
-// default is lipgloss.Left.
-func (r *FlexBox) SetRowAlign(align lipgloss.Position) *FlexBox {
-	r.rowAlign = align
-	return r
+// SetRowAlign places rows narrower than the widest row, such as rows of fixed-width
+// cells next to full-width rows, at lipgloss.Left, lipgloss.Center or lipgloss.Right.
+// The default is lipgloss.Left.
+func (b *FlexBox) SetRowAlign(align lipgloss.Position) *FlexBox {
+	b.rowAlign = align
+	return b
 }
 
-// NewRow initializes an empty Row of the box's width. Add it with AddRows or SetRows.
-func (r *FlexBox) NewRow() *Row {
-	rw := &Row{
-		cells: []*Cell{},
-		width: r.width,
-		style: lipgloss.NewStyle(),
-	}
-	return rw
+// NewRow initializes an empty Row. Add it with AddRows or SetRows.
+func (b *FlexBox) NewRow() *Row {
+	return &Row{style: styling{own: lipgloss.NewStyle()}}
 }
 
-// AddRows appends rows to the box.
-func (r *FlexBox) AddRows(rows []*Row) *FlexBox {
-	r.rows = append(r.rows, rows...)
-	r.setRecalculate()
-	return r
+// AddRows appends rows to the box. A nil row is left out.
+func (b *FlexBox) AddRows(rows []*Row) *FlexBox {
+	b.rows = appendElements(b.rows, rows)
+	return b
 }
 
-// SetRows replaces all rows of the box.
-func (r *FlexBox) SetRows(rows []*Row) *FlexBox {
-	r.rows = rows
-	r.setRecalculate()
-	return r
+// SetRows replaces all rows of the box. A nil row is left out. The box keeps its own
+// list, so later changes to the slice do not reach it.
+func (b *FlexBox) SetRows(rows []*Row) *FlexBox {
+	b.rows = replaceElements(b.rows, rows)
+	return b
 }
 
 // RowsLen returns the number of rows.
-func (r *FlexBox) RowsLen() int {
-	return len(r.rows)
+func (b *FlexBox) RowsLen() int {
+	return len(b.rows)
 }
 
-// GetRow returns the row at the index, or nil. The box recalculates on its next render.
-func (r *FlexBox) GetRow(index int) *Row {
-	if index >= 0 && index < len(r.rows) {
-		r.setRecalculate()
-		return r.rows[index]
+// GetRow returns the row at the index, or nil.
+func (b *FlexBox) GetRow(index int) *Row {
+	if index >= 0 && index < len(b.rows) {
+		return b.rows[index]
 	}
 	return nil
 }
 
 // GetRowCopy returns a copy of the row at the index, with copies of its cells, or nil.
-// Reading the copy does not trigger a recalculation.
-func (r *FlexBox) GetRowCopy(index int) *Row {
-	if index >= 0 && index < len(r.rows) {
-		rowCopy := r.rows[index].copy()
+// Changes to the copy do not reach the box.
+func (b *FlexBox) GetRowCopy(index int) *Row {
+	if index >= 0 && index < len(b.rows) {
+		rowCopy := b.rows[index].copy()
 		return &rowCopy
 	}
 	return nil
 }
 
 // GetRowCellCopy returns a copy of the cell at cellIndex in the row at rowIndex, or nil.
-// Reading the copy does not trigger a recalculation.
-func (r *FlexBox) GetRowCellCopy(rowIndex, cellIndex int) *Cell {
-	if rowIndex >= 0 && rowIndex < len(r.rows) {
-		if cellIndex >= 0 && cellIndex < len(r.rows[rowIndex].cells) {
-			cellCopy := r.rows[rowIndex].cells[cellIndex].copy()
-			return &cellCopy
-		}
+// Changes to the copy do not reach the box.
+func (b *FlexBox) GetRowCellCopy(rowIndex, cellIndex int) *Cell {
+	if row := b.GetRow(rowIndex); row != nil {
+		return row.GetCellCopy(cellIndex)
 	}
 	return nil
 }
 
-// UpdateRow replaces the row at the index. The index must exist.
-func (r *FlexBox) UpdateRow(index int, row *Row) *FlexBox {
-	r.rows[index] = row
-	r.setRecalculate()
-	return r
+// UpdateRow replaces the row at the index. An index out of range or a nil row changes
+// nothing.
+func (b *FlexBox) UpdateRow(index int, row *Row) *FlexBox {
+	if row != nil && index >= 0 && index < len(b.rows) {
+		b.rows[index] = row
+	}
+	return b
 }
 
 // LockRowHeight pins every row to the given number of lines, which disables vertical
 // scaling. A value of 0 or less restores ratio sizing.
-func (r *FlexBox) LockRowHeight(value int) *FlexBox {
-	r.fixedRowHeight = value
-	return r
+func (b *FlexBox) LockRowHeight(value int) *FlexBox {
+	b.fixedRowHeight = value
+	return b
 }
 
 // SetHeight sets the box height, the lines its rows share.
-func (r *FlexBox) SetHeight(value int) *FlexBox {
-	r.height = value
-	r.setRecalculate()
-	return r
+func (b *FlexBox) SetHeight(value int) *FlexBox {
+	b.height = value
+	return b
 }
 
 // SetWidth sets the box width, the columns its rows share.
-func (r *FlexBox) SetWidth(value int) *FlexBox {
-	r.width = value
-	for _, row := range r.rows {
-		row.setWidth(value)
-	}
-	return r
+func (b *FlexBox) SetWidth(value int) *FlexBox {
+	b.width = value
+	return b
 }
 
 // GetHeight returns the box height.
-func (r *FlexBox) GetHeight() int {
-	return r.getMaxHeight()
+func (b *FlexBox) GetHeight() int {
+	return b.height
 }
 
 // GetWidth returns the box width.
-func (r *FlexBox) GetWidth() int {
-	return r.getMaxWidth()
+func (b *FlexBox) GetWidth() int {
+	return b.width
 }
 
-// Render lays out the rows if anything changed since the last render, renders each row,
-// and joins them vertically with the row alignment, inside the box's own style.
-func (r *FlexBox) Render() string {
-	var inheritedStyle []lipgloss.Style
-	if r.styleAncestor {
-		inheritedStyle = append(inheritedStyle, r.style)
-	}
+// Render lays out the grid and returns it as exactly GetHeight lines of GetWidth columns.
+// Only what changed since the last render is rendered again: a cell when its size, style
+// or content changed, a row when one of its cells did. An unchanged grid costs a call to
+// each content generator.
+//
+// Text styled by an earlier render is reused as it is. After changing how lipgloss
+// renders a style at run time, such as the color profile, set the styles again.
+func (b *FlexBox) Render() string {
+	b.layout()
 
-	r.recalculate()
-	var renderedRows []string
-	for _, row := range r.rows {
-		renderedRows = append(renderedRows, row.render(inheritedStyle...))
-	}
-	return r.style.
-		Width(r.getContentWidth()).MaxWidth(r.getMaxWidth()).
-		Height(r.getContentHeight()).MaxHeight(r.getMaxHeight()).
-		Render(lipgloss.JoinVertical(r.rowAlign, renderedRows...))
-}
-
-// ForceRecalculate lays out the box and every row now instead of at the next render.
-func (r *FlexBox) ForceRecalculate() {
-	r.recalculate()
-	for _, rw := range r.rows {
-		rw.recalculate()
-	}
-}
-
-// recalculate fetches the row height distribution slice and sets it on the rows
-func (r *FlexBox) recalculate() {
-	if r.recalculateFlag {
-		if len(r.rows) > 0 {
-			r.distributeRowsDimensions(r.calculateRowHeight())
+	key := containerKey{width: max(b.width, 0), height: max(b.height, 0), style: b.style.id, align: b.rowAlign}
+	stale := !b.rendered || key != b.key || len(b.revs) != len(b.rows)
+	b.revs, b.parts = resize(b.revs, len(b.rows)), b.parts[:0]
+	passed := b.style.passed()
+	for i, row := range b.rows {
+		part := row.render(passed)
+		if part.rev != b.revs[i] {
+			b.revs[i], stale = part.rev, true
 		}
-		r.unsetRecalculate()
+		b.parts = append(b.parts, part)
+	}
+	if !stale {
+		return b.out
+	}
+	b.key, b.rendered = key, true
+
+	// Rows narrower than the widest row are aligned against it; the box then pads the
+	// group to its own width.
+	width, height := b.contentSize()
+	group := widest(b.parts)
+	if b.style.plain() {
+		b.frame.stack(b.parts, group, max(group, width), b.rowAlign, height)
+		b.frame.clip(width)
+		b.frame.extend(height)
+	} else {
+		b.frame.stack(b.parts, group, group, b.rowAlign, height)
+		f := b.style.frame
+		style := b.style.effective.
+			Width(key.width - f.edgeX).MaxWidth(key.width).
+			Height(key.height - f.edgeY())
+		text := renderStyled(style, b.frame.String())
+		b.frame.fill(text, key.width, key.height, f.top, f.bottom)
+	}
+	b.out = b.frame.String()
+	return b.out
+}
+
+// ForceRecalculate lays out the box and every row now, so the sizes of rows and cells
+// can be read before the next render.
+func (b *FlexBox) ForceRecalculate() {
+	b.layout()
+	passed := b.style.passed()
+	for _, row := range b.rows {
+		row.layout(passed)
 	}
 }
 
-func (r *FlexBox) setRecalculate() {
-	r.recalculateFlag = true
+// contentSize returns the area the rows share, inside the box's frame.
+func (b *FlexBox) contentSize() (width, height int) {
+	f := b.style.frame
+	return max(b.width-f.edgeX-f.paddingX, 0), max(b.height-f.edgeY()-f.paddingY, 0)
 }
 
-func (r *FlexBox) unsetRecalculate() {
-	r.recalculateFlag = false
+// layout sizes the rows. Every row takes the content width, and the rows share the
+// content height as tracks.
+func (b *FlexBox) layout() {
+	b.style.resolve(inherited{})
+	width, height := b.contentSize()
+
+	tracks := b.tracks[:0]
+	for _, row := range b.rows {
+		t := row.track()
+		if b.fixedRowHeight > 0 {
+			t.fixed = b.fixedRowHeight
+		}
+		tracks = append(tracks, t)
+	}
+	distribute(tracks, height)
+	for i, row := range b.rows {
+		row.width, row.height = width, tracks[i].size
+	}
+	b.tracks = tracks
 }
 
-// calculateRowHeight calculates the height of each row and returns the distribution array
-func (r *FlexBox) calculateRowHeight() (distribution []int) {
-	// Legacy behavior: if global fixedRowHeight is set, use it for all rows
-	if r.fixedRowHeight > 0 {
-		var fixedRows []int
-		for range r.rows {
-			fixedRows = append(fixedRows, r.fixedRowHeight)
-		}
-		return fixedRows
-	}
-
-	// New behavior: handle per-row fixed heights
-	var dynamicRowIndices []int
-	var dynamicRowMatrix [][]int
-	totalFixedHeight := 0
-
-	distribution = make([]int, len(r.rows))
-
-	// First pass: identify fixed and dynamic rows
-	for i, row := range r.rows {
-		// Check for the maximum fixed height among row and its cells
-		maxFixedHeight := row.fixedHeight
-		for _, cell := range row.cells {
-			if cell.fixedHeight > maxFixedHeight {
-				maxFixedHeight = cell.fixedHeight
-			}
-		}
-
-		if maxFixedHeight > 0 {
-			distribution[i] = maxFixedHeight
-			totalFixedHeight += maxFixedHeight
-		} else {
-			dynamicRowIndices = append(dynamicRowIndices, i)
-			// Get cell ratios for this dynamic row
-			var cellValues []int
-			for _, cell := range row.cells {
-				cellValues = append(cellValues, cell.ratioY)
-			}
-			dynamicRowMatrix = append(dynamicRowMatrix, cellValues)
-		}
-	}
-
-	// Second pass: distribute remaining space among dynamic rows
-	if len(dynamicRowIndices) > 0 {
-		remainingHeight := r.getContentHeight() - totalFixedHeight
-		if remainingHeight < 0 {
-			remainingHeight = 0
-		}
-		dynamicDistribution := calculateMatrixRatio(remainingHeight, dynamicRowMatrix)
-
-		for i, rowIndex := range dynamicRowIndices {
-			distribution[rowIndex] = dynamicDistribution[i]
+// appendElements appends the rows, columns or cells that are not nil to dst.
+func appendElements[T any](dst, elements []*T) []*T {
+	for _, element := range elements {
+		if element != nil {
+			dst = append(dst, element)
 		}
 	}
-
-	return distribution
+	return dst
 }
 
-// distributeRowsDimensions sets height and width of each row per distribution array
-func (r *FlexBox) distributeRowsDimensions(ratioDistribution []int) {
-	for index, row := range r.rows {
-		row.setHeight(ratioDistribution[index])
-		row.setWidth(r.getContentWidth())
+// replaceElements returns the rows, columns or cells that are not nil in the storage of
+// dst, which no longer holds what it held before.
+func replaceElements[T any](dst, elements []*T) []*T {
+	replaced := appendElements(dst[:0], elements)
+	if len(replaced) < len(dst) {
+		clear(dst[len(replaced):])
 	}
-}
-
-// getRowMatrix return the matrix of the cell heights for all the rows
-func (r *FlexBox) getRowMatrix() (rowMatrix [][]int) {
-	for _, row := range r.rows {
-		var cellValues []int
-		for _, cell := range row.cells {
-			cellValues = append(cellValues, cell.ratioY)
-		}
-		rowMatrix = append(rowMatrix, cellValues)
-	}
-	return rowMatrix
-}
-
-func (r *FlexBox) getContentWidth() int {
-	return r.getMaxWidth() - r.getExtraWidth()
-}
-
-func (r *FlexBox) getContentHeight() int {
-	return r.getMaxHeight() - r.getExtraHeight()
-}
-
-func (r *FlexBox) getMaxWidth() int {
-	return r.width
-}
-
-func (r *FlexBox) getMaxHeight() int {
-	return r.height
-}
-
-func (r *FlexBox) getExtraWidth() int {
-	return r.style.GetHorizontalFrameSize()
-}
-
-func (r *FlexBox) getExtraHeight() int {
-	return r.style.GetVerticalFrameSize()
+	return replaced
 }

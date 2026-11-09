@@ -1,39 +1,44 @@
 package flexbox
 
 import (
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
+	"github.com/charmbracelet/x/cellbuf"
 )
 
 // Cell is the building block of a grid. In a FlexBox the cells of a row sit side by
 // side; in a HorizontalFlexBox the cells of a column stack vertically.
 type Cell struct {
-	// style of the cell, when rendering it will inherit the style of the parent row
-	style lipgloss.Style
-	// id of the cell, if not set it will default to the index in the row
+	style styling
+	// id names the cell for GetCellWithID
 	id string
 
-	// ratioX width ratio of the cell
-	ratioX int
-	// ratioY height ratio of the cell
-	ratioY int
-	// minWidth minimal width of the cell
-	minWidth int
-	// minHeight minimal height of the cell
-	minHeight int
+	// ratioX and ratioY are the cell's share of the width and height
+	ratioX, ratioY int
+	// minWidth and minHeight are the least size of a ratio-sized cell
+	minWidth, minHeight int
+	// fixedWidth and fixedHeight replace the ratio when greater than 0
+	fixedWidth, fixedHeight int
 
-	// fixedWidth if > 0, this cell will have a fixed width instead of ratio-based
-	fixedWidth int
-	// fixedHeight if > 0, this cell requests a fixed height (row will use max of all cells)
-	fixedHeight int
+	// width and height are the size the last layout gave the cell
+	width, height int
 
-	width  int
-	height int
-	// contentGenerator is a function that generates the content of the cell depending on the
-	// size of the cell, this can be useful for wrapping text or generating dynamic content.
+	// contentGenerator builds the content for the cell's content size
 	contentGenerator func(maxX, maxY int) string
+
+	// out is the last render and key what it was rendered from
+	out      block
+	key      cellKey
+	rendered bool
+}
+
+// cellKey is everything the rendered block of a cell depends on.
+type cellKey struct {
+	width, height int
+	style         uint64
+	content       string
 }
 
 // CellOption configures a Cell as NewCell creates it.
@@ -43,11 +48,7 @@ type CellOption func(*Cell)
 // it.
 func WithStyle(style lipgloss.Style) CellOption {
 	return func(c *Cell) {
-		c.style = style.
-			UnsetWidth().
-			UnsetMaxWidth().
-			UnsetHeight().
-			UnsetMaxHeight()
+		c.style.set(style)
 	}
 }
 
@@ -55,12 +56,9 @@ func WithStyle(style lipgloss.Style) CellOption {
 // Options such as WithStyle configure the cell before it is returned.
 func NewCell(ratioX, ratioY int, opts ...CellOption) *Cell {
 	c := &Cell{
-		style:    lipgloss.NewStyle(),
-		ratioX:   ratioX,
-		ratioY:   ratioY,
-		minWidth: 0,
-		width:    0,
-		height:   0,
+		style:  styling{own: lipgloss.NewStyle()},
+		ratioX: ratioX,
+		ratioY: ratioY,
 	}
 	for _, opt := range opts {
 		opt(c)
@@ -70,176 +68,258 @@ func NewCell(ratioX, ratioY int, opts ...CellOption) *Cell {
 
 // SetID names the cell for GetCellWithID. Unnamed cells get their index in the row or
 // column as their ID.
-func (r *Cell) SetID(id string) *Cell {
-	r.id = id
-	return r
+func (c *Cell) SetID(id string) *Cell {
+	c.id = id
+	return c
+}
+
+// GetID returns the cell's ID: the name SetID gave it, or its index in the row or column
+// it was added to.
+func (c *Cell) GetID() string {
+	return c.id
 }
 
 // SetContent sets static content. The cell wraps it at its content width and clips it
 // to its content height when it renders.
-func (r *Cell) SetContent(content string) *Cell {
-	r.contentGenerator = func(_, _ int) string {
+func (c *Cell) SetContent(content string) *Cell {
+	c.contentGenerator = func(_, _ int) string {
 		return content
 	}
-	return r
+	return c
 }
 
 // SetContentGenerator sets a function that builds the content each time the cell
-// renders. It receives the width and height inside the border and margins; padding, if
-// the style has any, lies inside that area.
-func (r *Cell) SetContentGenerator(generator func(maxX, maxY int) string) *Cell {
-	r.contentGenerator = generator
-	return r
+// renders. It receives the width and height inside the border and margins, never less
+// than 0; padding, if the style has any, lies inside that area. A cell without columns
+// or lines does not call it.
+func (c *Cell) SetContentGenerator(generator func(maxX, maxY int) string) *Cell {
+	c.contentGenerator = generator
+	return c
 }
 
 // GetContent returns the content as set or as the generator builds it for the cell's
 // current content size, before wrapping and clipping.
-func (r *Cell) GetContent() string {
-	if r.contentGenerator == nil {
+func (c *Cell) GetContent() string {
+	if c.contentGenerator == nil {
 		return ""
 	}
-	return r.contentGenerator(r.getContentWidth(), r.getContentHeight())
+	if !c.style.resolved {
+		c.style.resolve(inherited{})
+	}
+	return c.contentGenerator(c.contentSize())
 }
 
-// SetMinWidth keeps a ratio-sized cell at least this wide while it stays responsive.
-// It applies to cells of a FlexBox only, not a HorizontalFlexBox.
-func (r *Cell) SetMinWidth(value int) *Cell {
-	r.minWidth = value
-	return r
+// SetMinWidth keeps a ratio-sized cell at least this wide. In a FlexBox it applies to
+// the cell. In a HorizontalFlexBox it applies to the cell's column, which takes the
+// largest minimum among its cells.
+func (c *Cell) SetMinWidth(value int) *Cell {
+	c.minWidth = value
+	return c
 }
 
-// SetFixedWidth gives the cell a fixed width instead of a ratio-based one. A value of 0
-// or less restores ratio sizing. It applies to cells of a FlexBox only, not a
-// HorizontalFlexBox.
-func (r *Cell) SetFixedWidth(value int) *Cell {
-	r.fixedWidth = value
-	return r
+// SetFixedWidth gives the cell a fixed width instead of a ratio-based one. In a FlexBox
+// it applies to the cell. In a HorizontalFlexBox it applies to the cell's column, which
+// takes the largest fixed width among its cells. A value of 0 or less restores ratio
+// sizing.
+func (c *Cell) SetFixedWidth(value int) *Cell {
+	c.fixedWidth = value
+	return c
 }
 
-// Deprecated: use [*Cell.SetMinHeight]
-func (r *Cell) SetMinHeigth(value int) *Cell {
-	return r.SetMinHeight(value)
+// SetMinHeigth is the misspelled name of SetMinHeight.
+//
+// Deprecated: use [Cell.SetMinHeight].
+func (c *Cell) SetMinHeigth(value int) *Cell {
+	return c.SetMinHeight(value)
 }
 
-// SetMinHeight keeps a ratio-sized cell at least this tall while it stays responsive.
-// It applies to cells of a HorizontalFlexBox only, not a FlexBox.
-func (r *Cell) SetMinHeight(value int) *Cell {
-	r.minHeight = value
-	return r
+// SetMinHeight keeps a ratio-sized cell at least this tall. In a HorizontalFlexBox it
+// applies to the cell. In a FlexBox it applies to the cell's row, which takes the
+// largest minimum among its cells.
+func (c *Cell) SetMinHeight(value int) *Cell {
+	c.minHeight = value
+	return c
 }
 
-// SetFixedHeight asks for a fixed height for the cell's row. The row takes the largest
-// request among its cells, so every cell in it gets that height. A value of 0 or less
-// withdraws the request. It applies to cells of a FlexBox only, not a HorizontalFlexBox.
-func (r *Cell) SetFixedHeight(value int) *Cell {
-	r.fixedHeight = value
-	return r
+// SetFixedHeight gives the cell a fixed height instead of a ratio-based one. In a
+// HorizontalFlexBox it applies to the cell. In a FlexBox it applies to the cell's row,
+// which takes the largest fixed height among its cells; each cell then gets its ratioY
+// share of that row. A value of 0 or less restores ratio sizing.
+func (c *Cell) SetFixedHeight(value int) *Cell {
+	c.fixedHeight = value
+	return c
 }
 
 // SetStyle replaces the style. Width and height keys are removed because the grid owns
 // the cell's size.
-func (r *Cell) SetStyle(style lipgloss.Style) *Cell {
-	r.style = style.
-		UnsetWidth().
-		UnsetMaxWidth().
-		UnsetHeight().
-		UnsetMaxHeight()
-	return r
+func (c *Cell) SetStyle(style lipgloss.Style) *Cell {
+	c.style.set(style)
+	return c
 }
 
-// GetStyle returns a copy of the cell's style.
-func (r *Cell) GetStyle() lipgloss.Style {
-	return r.style
+// GetStyle returns a copy of the style set on the cell. What a row or column passes
+// down is not part of it.
+func (c *Cell) GetStyle() lipgloss.Style {
+	return c.style.own
 }
 
-// GetWidth returns the width the grid gave the cell, frame included. A content generator
-// receives the content area instead.
-func (r *Cell) GetWidth() int {
-	return r.getMaxWidth()
-}
-
-// GetHeight returns the height the grid gave the cell, frame included. A content
+// GetWidth returns the width the last layout gave the cell, frame included. A content
 // generator receives the content area instead.
-func (r *Cell) GetHeight() int {
-	return r.getMaxHeight()
+func (c *Cell) GetWidth() int {
+	return c.width
 }
 
-// render the cell into string.
+// GetHeight returns the height the last layout gave the cell, frame included. A content
+// generator receives the content area instead.
+func (c *Cell) GetHeight() int {
+	return c.height
+}
+
+// contentSize returns the area inside the cell's border and margins.
+func (c *Cell) contentSize() (width, height int) {
+	return max(c.width-c.style.frame.edgeX, 0), max(c.height-c.style.frame.edgeY(), 0)
+}
+
+// render returns the cell as a block of exactly its width by its height, building it
+// only when its size, style or content changed since the last render.
 //
 // The frame (margins and border) renders complete whenever the cell has room for it:
 // the content is wrapped the way lipgloss wraps it and clipped to the lines left between
 // the paddings, so content taller than the cell loses its bottom lines, never the border.
-// A cell with no lines renders as one blank line of its width so a row keeps its columns,
-// and a cell with no columns renders as empty lines so a column keeps its rows.
-func (r *Cell) render(inherited ...lipgloss.Style) string {
-	for _, style := range inherited {
-		r.style = r.style.Inherit(style)
-	}
+func (c *Cell) render(from inherited) *block {
+	c.style.resolve(from)
 
-	if r.getMaxHeight() <= 0 {
-		return strings.Repeat(" ", max(r.getMaxWidth(), 0))
+	width, height := max(c.width, 0), max(c.height, 0)
+	var content string
+	if width > 0 && height > 0 && c.contentGenerator != nil {
+		content = c.contentGenerator(c.contentSize())
 	}
-	if r.getMaxWidth() <= 0 {
-		// no columns: hold the lines so a column keeps its rows and add nothing to a row
-		return strings.Repeat("\n", r.getMaxHeight()-1)
+	key := cellKey{width: width, height: height, style: c.style.id, content: content}
+	if c.rendered && key == c.key {
+		return &c.out
 	}
+	c.key, c.rendered = key, true
 
-	s := r.GetStyle().
-		Width(r.getContentWidth()).MaxWidth(r.getMaxWidth()).
-		Height(r.getContentHeight())
-	block := s.Render(r.fitContent(r.GetContent()))
-	return fitHeight(block, r.getMaxHeight(),
-		r.style.GetMarginTop()+r.style.GetBorderTopSize(),
-		r.style.GetBorderBottomSize()+r.style.GetMarginBottom())
+	switch {
+	case width == 0 || height == 0:
+		c.out.collapse(width, height)
+	case c.style.plain():
+		c.out.fill(wrapPlain(content, width, height), width, height, 0, 0)
+	default:
+		f := c.style.frame
+		contentWidth, contentHeight := width-f.edgeX, height-f.edgeY()
+		style := c.style.effective.
+			Width(contentWidth).MaxWidth(width).
+			Height(contentHeight)
+		text := renderStyled(style, fitContent(content, contentWidth-f.paddingX, contentHeight-f.paddingY))
+		c.out.fill(text, width, height, f.top, f.bottom)
+	}
+	return &c.out
 }
 
-// fitContent wraps content at the width lipgloss wraps it and keeps the lines that fit
-// between the vertical paddings. Trailing spaces on the last line survive, so a
-// centered or right-aligned block keeps every line at the same offset.
-func (r *Cell) fitContent(content string) string {
-	wrapAt := r.getContentWidth() - r.style.GetHorizontalPadding()
-	lines := r.getContentHeight() - r.style.GetVerticalPadding()
-	if wrapAt <= 0 || lines <= 0 {
+// copy returns a copy of the cell that shares no render state with it.
+func (c *Cell) copy() Cell {
+	cellCopy := *c
+	cellCopy.out, cellCopy.rendered = block{}, false
+	return cellCopy
+}
+
+// appendCells appends the cells that are not nil to dst and gives every cell without an
+// ID its index as its ID.
+func appendCells(dst []*Cell, cells []*Cell) []*Cell {
+	dst = appendElements(dst, cells)
+	for i, c := range dst {
+		if c.id == "" {
+			c.id = strconv.Itoa(i)
+		}
+	}
+	return dst
+}
+
+// cellWithID returns the first of cells with the ID, or nil.
+func cellWithID(cells []*Cell, id string) *Cell {
+	for _, c := range cells {
+		if c.id == id {
+			return c
+		}
+	}
+	return nil
+}
+
+// copyCells returns copies of cells.
+func copyCells(cells []*Cell) []*Cell {
+	copies := make([]*Cell, len(cells))
+	for i, c := range cells {
+		cellCopy := c.copy()
+		copies[i] = &cellCopy
+	}
+	return copies
+}
+
+// fitContent wraps content at width, the width lipgloss wraps it at, and keeps the
+// first height lines.
+func fitContent(content string, width, height int) string {
+	if width <= 0 || height <= 0 {
 		return ""
 	}
-	// ansi.Wrap, used here and again inside lipgloss, drops the spaces at the
-	// very end of its input. A newline after the last line keeps them; the
-	// empty line it adds falls inside the padding or is trimmed by fitHeight.
-	wrapped := strings.TrimSuffix(ansi.Wrap(content+"\n", wrapAt, ""), "\n")
-	return clipLines(wrapped, lines) + "\n"
+	if strings.Contains(content, "\r\n") {
+		content = strings.ReplaceAll(content, "\r\n", "\n")
+	}
+	// the wrap drops the spaces at the very end of its input; a newline after the
+	// last line keeps them
+	wrapped := strings.TrimSuffix(wrap(content+"\n", width), "\n")
+	return firstLines(wrapped, height)
 }
 
-func (r *Cell) getContentWidth() int {
-	return r.getMaxWidth() - r.getExtraWidth()
+// wrapPlain prepares content for a cell with the empty style the way fitContent and
+// lipgloss prepare it for a styled one: it wraps at width, keeps the first height lines,
+// and turns tabs into four spaces.
+func wrapPlain(content string, width, height int) string {
+	if fits(content, width) {
+		return content
+	}
+	text := fitContent(content, width, height)
+	if strings.Contains(text, "\t") {
+		text = strings.ReplaceAll(text, "\t", "    ")
+	}
+	return wrap(text, width)
 }
 
-func (r *Cell) getContentHeight() int {
-	return r.getMaxHeight() - r.getExtraHeight()
+// wrap wraps text at width with the function lipgloss wraps with, so a cell counts the
+// same lines lipgloss renders. It breaks at words, breaks a word that is too long, and
+// closes and reopens escape sequences around every break.
+func wrap(text string, width int) string {
+	return cellbuf.Wrap(text, width, "")
 }
 
-func (r *Cell) getMaxWidth() int {
-	return r.width
+// fits reports whether every line of text is printable ASCII and at most width columns
+// wide. Wrapping leaves such text as it is.
+func fits(text string, width int) bool {
+	column := 0
+	for i := 0; i < len(text); i++ {
+		switch c := text[i]; {
+		case c == '\n':
+			column = 0
+		case c < ' ' || c > '~':
+			return false
+		default:
+			if column++; column > width {
+				return false
+			}
+		}
+	}
+	return true
 }
 
-func (r *Cell) getMaxHeight() int {
-	return r.height
-}
-
-func (r *Cell) getExtraWidth() int {
-	// Only subtract border and margin, not padding.
-	// lipgloss Width() sets the content area INCLUDING padding,
-	// so we must not double-subtract padding.
-	return r.style.GetHorizontalBorderSize() + r.style.GetHorizontalMargins()
-}
-
-func (r *Cell) getExtraHeight() int {
-	// Only subtract border and margin, not padding.
-	// lipgloss Height() sets the content area INCLUDING padding.
-	return r.style.GetVerticalBorderSize() + r.style.GetVerticalMargins()
-}
-
-func (r *Cell) copy() Cell {
-	cellCopy := *r
-	cellCopy.style = r.GetStyle()
-	return cellCopy
+// firstLines returns at most n lines of s, for n of 1 or more.
+func firstLines(s string, n int) string {
+	end := 0
+	for i := 0; i < n; i++ {
+		next := strings.IndexByte(s[end:], '\n')
+		if next < 0 {
+			return s
+		}
+		end += next + 1
+	}
+	return s[:end-1]
 }
