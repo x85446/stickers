@@ -192,13 +192,14 @@ func relined(text, on, off string) string {
 	return b.String()
 }
 
-// resetsAttributes reports whether the parameters of a text attribute sequence turn
-// every attribute off: one of them is empty or 0, outside the numbers of a color.
+// resetsAttributes reports whether the parameters of a text attribute sequence end an
+// underline or a strikethrough: a parameter outside the numbers of a color resets every
+// attribute (empty or 0) or turns one of the lines off (24, 29, 59 or 4:0).
 func resetsAttributes(params string) bool {
 	fields := strings.Split(params, ";")
 	for i := 0; i < len(fields); i++ {
-		switch fields[i] {
-		case "", "0":
+		switch strings.TrimLeft(fields[i], "0") {
+		case "", "24", "29", "59", "4:0":
 			return true
 		case "38", "48", "58":
 			// a color follows as 5;n or 2;r;g;b

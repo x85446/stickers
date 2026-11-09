@@ -69,6 +69,22 @@ func TestNoLinesWithoutAColorProfile(t *testing.T) {
 	}
 }
 
+// TestLinesResumeAfterAnySequenceThatEndsThem: the underline of an element comes back
+// after content turns it off in any way.
+func TestLinesResumeAfterAnySequenceThatEndsThem(t *testing.T) {
+	on, off := "\x1b[4m", "\x1b[24m"
+	for _, end := range []string{"\x1b[m", "\x1b[0m", "\x1b[00m", "\x1b[24m", "\x1b[29m", "\x1b[59m", "\x1b[4:0m", "\x1b[01;00m"} {
+		if got := relined("a"+end+"b", on, off); got != on+"a"+end+on+"b"+off {
+			t.Errorf("after %q the line does not resume: %q", end, got)
+		}
+	}
+	for _, keep := range []string{"\x1b[31m", "\x1b[39m", "\x1b[38;5;0m", "\x1b[38;2;0;0;0m", "\x1b[4:3m", "\x1b[1;34m"} {
+		if got := relined("a"+keep+"b", on, off); got != on+"a"+keep+"b"+off {
+			t.Errorf("after %q the line is written again: %q", keep, got)
+		}
+	}
+}
+
 func TestRelined(t *testing.T) {
 	on, off := "\x1b[4m", "\x1b[24m"
 	for _, tc := range []struct{ text, want string }{
