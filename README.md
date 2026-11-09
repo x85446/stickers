@@ -27,6 +27,7 @@ This module lives at `github.com/x85446/stickers/v2`. It is a fork of
   - [Content](#content)
   - [Styles](#styles)
   - [Reading and changing the grid](#reading-and-changing-the-grid)
+  - [Positions and the mouse](#positions-and-the-mouse)
   - [HorizontalFlexBox](#horizontalflexbox)
   - [Recipes](#recipes)
 - [Table](#table)
@@ -226,6 +227,39 @@ style is set; the grid owns sizes.
   them without rendering, so `GetWidth` and `GetHeight` on rows and cells can
   be read first.
 
+### Positions and the mouse
+
+A layout places every element as well as sizing it. Positions count columns and
+lines from the top left corner of the box.
+
+- `GetBounds()` on a cell, row or column returns its rectangle, frame included,
+  as an `image.Rectangle`.
+- `cell.GetContentBounds()` returns the rectangle inside the cell's border and
+  margins, the area a content generator fills.
+- `box.CellAt(x, y)` returns the cell that shows at a point, or `nil` on a
+  frame, in a blank, or outside the box.
+
+A mouse click carries the pointer's position, so `CellAt` turns it into a cell:
+
+```go
+case tea.MouseClickMsg:
+	if cell := m.box.CellAt(msg.X, msg.Y); cell != nil {
+		m.selected = cell.GetID()
+	}
+```
+
+Set `view.MouseMode = tea.MouseModeCellMotion` in `View` to receive mouse
+messages. The same positions place the terminal's cursor in a cell:
+
+```go
+origin := cell.GetContentBounds().Min
+view.Cursor = tea.NewCursor(origin.X, origin.Y)
+```
+
+The coordinates belong to the box. A box that does not start at the top left
+corner of the screen has its own position to subtract from the pointer's. A box
+nested in a cell starts at that cell's `GetContentBounds().Min`.
+
 ### HorizontalFlexBox
 
 `NewHorizontal(width, height)` lines up columns side by side; cells stack
@@ -265,8 +299,8 @@ which takes the largest value among its cells.
   are narrower than it, at `lipgloss.Left`, `lipgloss.Center` or
   `lipgloss.Right`. The default is left. Columns that together are wider than
   the box are cut at its edge.
-- `GetColumn`, `GetColumnCopy`, `GetColumnCellCopy`, `UpdateColumn` and
-  `ColumnsLen` mirror the `FlexBox` row methods.
+- `GetColumn`, `GetColumnCopy`, `GetColumnCellCopy`, `UpdateColumn`,
+  `ColumnsLen` and `CellAt` mirror the `FlexBox` methods.
 
 ### Recipes
 
@@ -295,6 +329,19 @@ flexbox.NewCell(3, 1).SetContentGenerator(func(w, h int) string {
 	m.viewport.SetHeight(h)
 	return m.viewport.View()
 })
+```
+
+**Float a box over the grid.** Lip Gloss layers put one render on top of
+another, which keeps the grid visible around a dialog:
+
+```go
+dialog := dialogStyle.Render("Save changes?")
+w, h := lipgloss.Size(dialog)
+layers := lipgloss.NewCompositor(
+	lipgloss.NewLayer(m.box.Render()),
+	lipgloss.NewLayer(dialog).X((m.width-w)/2).Y((m.height-h)/2).Z(1),
+)
+content := lipgloss.NewCanvas(m.width, m.height).Compose(layers).Render()
 ```
 
 **Show live data.** A content generator runs on every render, so content that
@@ -378,6 +425,12 @@ s := t.Render()
   count over the rows the filter keeps, in sorted order; without rows the
   value is `""` and the row `nil`. While a filter hides the cursor's row the
   cursor sits on the last row, and it is back on its row when the row is.
+- **Mouse.** `ColumnAt(x)` returns the column at a column of the rendered
+  table and `RowAt(y)` the row at one of its lines; both are false where there
+  is none. `SetCursorLocation(column, row)` moves the cursor there and scrolls
+  to it. A click on line 0 is on the header, so `ColumnAt` gives the column to
+  sort by. A table that does not start at the top left corner of the screen
+  has its position to subtract first.
 - **Horizontal scrolling.** Columns are shown while their minimum widths fit
   the table width; moving the cursor past the visible range scrolls.
   `GetVisibleColumnRange` returns the first and last visible column. With all
@@ -406,8 +459,8 @@ s := t.Render()
 Bubble Tea calls `View` after every message, so `Render` runs far more often
 than the layout changes. Both packages are built for that:
 
-- A box computes its layout on every render with integer math and no
-  allocation.
+- A box computes its layout, sizes and positions, on every render with
+  integer math and no allocation.
 - A cell renders again only when its size, its style or its content changed. A
   row renders again only when one of its cells did, and the box only when one
   of its rows did.
@@ -426,14 +479,14 @@ and a 160×48 table in its default colors:
 
 | Benchmark | Time per render |
 |---|---|
-| Grid, nothing changed | 0.4 µs, no allocation |
+| Grid, nothing changed | 0.5 µs, no allocation |
 | Grid, one cell's content changed | 35 µs |
 | Grid, resized, every cell rendered | 300 µs |
-| Table of 1,000 rows, nothing changed | 7 µs, no allocation |
-| The same table in a flexbox cell, nothing changed | 7 µs, no allocation |
-| Table, cursor moved one row | 43 µs |
-| Table of 100,000 rows, scrolled one row | 43 µs |
-| Table of 100,000 rows, cursor moved under a filter | 41 µs |
+| Table of 1,000 rows, nothing changed | 8 µs, no allocation |
+| The same table in a flexbox cell, nothing changed | 9 µs, no allocation |
+| Table, cursor moved one row | 45 µs |
+| Table of 100,000 rows, scrolled one row | 45 µs |
+| Table of 100,000 rows, cursor moved under a filter | 43 µs |
 | Sort 10,000 rows | 0.8 ms |
 | Filter 100,000 rows and render | 2.5 ms |
 
@@ -442,7 +495,7 @@ and `View` on one goroutine, so a model needs no locking.
 
 ## Demos
 
-The `example` directory holds twelve demos and a combined program that cycles
+The `example` directory holds thirteen demos and a combined program that cycles
 through them. It is a Go module of its own, so the demos' dependencies stay
 out of the library's `go.mod`.
 
@@ -452,16 +505,18 @@ make run        # all demos: tab / shift+tab cycle, a about, q quit
 make demo-7     # one demo
 ```
 
-Every demo answers `a` for an about box and `q` to quit. In `make run` the
-purple header names the demo, lists its own keys, then the shared keys.
+Every demo answers `a` for an about box, which floats over the demo as a Lip
+Gloss layer, and `q` to quit. In `make run` the purple header names the demo,
+lists its own keys, then the shared keys. Each demo names itself in the
+terminal's title.
 
 | Demo | Shows | Keys |
 |---|---|---|
 | 1 FlexBox Simple | ratio-based rows and cells | |
 | 2 FlexBox Horizontal | `HorizontalFlexBox` columns | |
-| 3 FlexBox with Table | a `Table` inside a cell through a content generator | arrows, ctrl+s sort, enter copies the cell into the grid, letters filter |
-| 4 Table Simple String | string columns, sorting, filtering | arrows, ctrl+s, enter, letters |
-| 5 Table Multi-Type | typed columns via gocsv, numeric sorting | arrows, ctrl+s, enter, letters |
+| 3 FlexBox with Table | a `Table` inside a cell through a content generator, clicks placed by the cell's position | arrows, click, wheel, ctrl+s or a click on a header sorts, enter copies the cell into the grid, letters or a paste filter |
+| 4 Table Simple String | string columns, sorting, filtering, the mouse | arrows, click, wheel, ctrl+s or a click on a header, enter copies the cell to the clipboard, letters or a paste |
+| 5 Table Multi-Type | typed columns via gocsv, numeric sorting, the mouse | arrows, click, wheel, ctrl+s or a click on a header, enter copies the cell to the clipboard, letters or a paste |
 | 6 Nested Borders | recursive boxes through a content generator | b border |
 | 7 Simple Borders | labeled cells, every border style, short cells | b border |
 | 8 Fixed Row Heights | `SetFixedHeight` on rows | m fixed/dynamic |
@@ -469,6 +524,7 @@ purple header names the demo, lists its own keys, then the shared keys.
 | 10 Mixed Fixed/Dynamic | fixed and ratio sizing in one grid | b border, m fixed/dynamic, h text |
 | 11 Cell Config | changing a cell's fixed sizes at run time | b border, h text, C-W select a cell, then w, h, digits, enter, esc |
 | 12 Row Alignment | `SetRowAlign` with rows narrower than the box | r row align |
+| 13 Mouse and Cursor | `CellAt` for clicks and `GetContentBounds` for the terminal's cursor | click, arrows |
 
 The table demos show `example/sample/sample.csv`, which is compiled into them.
 
@@ -491,8 +547,12 @@ The repository holds two Go modules. The root module is the library: packages
 
 The tests cover:
 
-- **`flexbox`.** The sizing rules, the block operations behind rendering, and
-  every rule under [What renders when space runs out](#what-renders-when-space-runs-out).
+- **`flexbox`.** The sizing rules, the block operations behind rendering, the
+  style features of Lip Gloss v2 (gradient borders, underline styles,
+  hyperlinks), and every rule under
+  [What renders when space runs out](#what-renders-when-space-runs-out). For
+  random grids, the text a box renders inside a cell's bounds must be the
+  cell's own block, which ties positions to the screen.
   A reference renderer composes random grids with plain Lip Gloss joins and
   styles; the boxes must return the same text after every random change, which
   covers both the direct assembly of unstyled elements and the reuse of what
@@ -502,7 +562,9 @@ The tests cover:
   overrides. A table that renders after every random change must show what a
   table built from scratch with the same changes shows.
 - **`example`.** A test cycles every demo at several terminal sizes and checks
-  that each fits under the header.
+  that each fits under the header. Others click cells and table rows, turn the
+  wheel and paste, through the combined program's header and into a nested
+  table.
 
 Continuous integration runs the tests and the linter on every push and pull
 request.

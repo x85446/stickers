@@ -27,6 +27,12 @@
 // value in one column contains a string, ignoring case. The cursor and GetCursorValue,
 // GetCursorRow and GetCursorLocation work on the rows the filter keeps, in sorted order.
 //
+// # Mouse
+//
+// ColumnAt and RowAt turn a position on the rendered table into a column and a row, and
+// SetCursorLocation moves the cursor to them. Line 0 is the header, so a click there
+// names the column to sort by.
+//
 // # Styles
 //
 // SetStyles overrides any of the StyleKey entries and keeps the defaults for the rest.

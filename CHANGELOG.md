@@ -34,6 +34,8 @@ All notable changes to this project will be documented in this file.
 - Content with Windows line ends leaves no carriage return in a cell.
 - A bordered row too short for its cells closes its frame over its full width instead of two columns.
 - A nil row, column or cell, such as a getter returns for an index that is not there, is left out instead of causing a panic at the next render.
+- A hyperlink set on a cell, row or column stays in that element. It used to run on into the cells beside it on every line but the last.
+- A row, column or box that underlines or strikes through keeps its styled cells whole. Lip Gloss writes the two one rune at a time, which cut the cells' escape sequences apart.
 - `Render` returns exactly the box's height in lines and width in columns for every size and style.
 #### table
 - `SetFilter`, `OrderByAsc` and `OrderByDesc` ignore a negative index. They used to panic.
@@ -55,12 +57,14 @@ All notable changes to this project will be documented in this file.
 - A table rendered before `SetHeight` is the height given to `NewTable`, not one line taller.
 - After horizontal scrolling, rows size their cells with the ratios and minimum widths of the columns on screen, as the header does.
 ### Performance
-- `Render` reuses what did not change. A cell renders again only when its size, style or content changed, a row or column only when one of its cells did. On a 160×48 grid of 17 cells an unchanged render takes 0.4 µs instead of 1.8 ms and allocates nothing; a render after one cell's content changed takes 35 µs.
+- `Render` reuses what did not change. A cell renders again only when its size, style or content changed, a row or column only when one of its cells did. On a 160×48 grid of 17 cells an unchanged render takes 0.5 µs instead of 1.8 ms and allocates nothing; a render after one cell's content changed takes 35 µs.
 - Rows, columns and boxes without a style are assembled directly instead of through a Lip Gloss style and join, which makes a full render after a resize about five times faster.
-- A table keeps the rows on screen between renders. A cursor move takes about 45 µs instead of 1 ms, also while scrolling and under a filter, and an unchanged table 7 µs.
+- A table keeps the rows on screen between renders. A cursor move takes about 45 µs instead of 1 ms, also while scrolling and under a filter, and an unchanged table 8 µs.
 - Sorting is a stable O(n log n) sort in place instead of a bubble sort: 0.8 ms instead of 102 ms for 10,000 rows.
 - The filter runs when the filter or the rows change, not on every cursor move, and compares ASCII text without allocating.
 ### Features
+- Positions and hit testing. `GetBounds` on a cell, row or column returns its rectangle in the box, `Cell.GetContentBounds` the rectangle inside the cell's border and margins, and `CellAt` on a box the cell that shows at a point. A mouse click finds its cell, and the terminal's cursor finds its place in one.
+- Mouse support for the table. `ColumnAt` and `RowAt` turn a position on the rendered table into a column and a row, and `SetCursorLocation` moves the cursor to them.
 - The cell setters apply in both boxes. In a `FlexBox`, `SetMinHeight` on a cell sets the minimum height of its row. In a `HorizontalFlexBox`, `SetFixedHeight` on a cell pins its height, and `SetFixedWidth` and `SetMinWidth` set the width of its column.
 - `Column.SetFixedWidth` pins a column, as `Row.SetFixedHeight` pins a row.
 - `Table.GetCursorRow` returns the values of the row under the cursor.
@@ -70,6 +74,9 @@ All notable changes to this project will be documented in this file.
 ### Changes
 - `SetRatio` and `SetMinWidth` panic on a wrong number of values or a ratio under 1 instead of calling `log.Fatalf`, and copy the slices they are given.
 ### Examples
+- demo-13 selects cells with the mouse through `CellAt` and puts the terminal's cursor in the selected cell.
+- The table demos take the mouse: a click selects a cell, a click on a header sorts, the wheel moves the cursor. A paste extends the filter, and enter in demo-4 and demo-5 copies the cell to the clipboard. The three demos share their input handling in `example/tableinput`.
+- The about box floats over its demo as a Lip Gloss layer, from the shared package `example/about`, and every demo names itself in the terminal's title.
 - `make run` runs every demo in one program. The Makefile follows the two-layer convention with `build`, `test`, `lint`, `bench`, `cover` and `check` targets.
 - The table demos compile `example/sample/sample.csv` in, so every demo runs from any directory.
 - demo-3 embeds its table through a content generator.
