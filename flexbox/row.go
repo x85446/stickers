@@ -1,6 +1,10 @@
 package flexbox
 
-import "charm.land/lipgloss/v2"
+import (
+	"image"
+
+	"charm.land/lipgloss/v2"
+)
 
 // Row holds the cells of one row of a FlexBox. Its height comes from the box; its cells'
 // widths and heights come from their ratios and fixed sizes. Rows stack vertically.
@@ -8,8 +12,11 @@ type Row struct {
 	style styling
 	cells []*Cell
 
-	// width and height are the size the last layout gave the row
+	// width and height are the size the last layout gave the row, x and y where it put
+	// the row's top left corner in the box, and cellsWidth the columns its cells take
 	width, height int
+	x, y          int
+	cellsWidth    int
 	// fixedHeight replaces the ratio-based height when greater than 0
 	fixedHeight int
 
@@ -105,6 +112,13 @@ func (r *Row) GetHeight() int {
 	return r.height
 }
 
+// GetBounds returns the rectangle the row takes in its box, frame included, counted
+// from the box's top left corner. A row of fixed-width cells is as wide as its cells,
+// which can be less than GetWidth.
+func (r *Row) GetBounds() image.Rectangle {
+	return image.Rect(r.x, r.y, r.x+r.shownWidth(), r.y+max(r.height, 0))
+}
+
 // track returns how the row shares the height of its box: the largest ratioY, minimum
 // height and fixed height among its cells, and its own fixed height.
 func (r *Row) track() track {
@@ -136,10 +150,40 @@ func (r *Row) layout(from inherited) {
 		largest = max(largest, c.ratioY)
 	}
 	distribute(tracks, width)
+	passed := r.style.passed()
+	r.cellsWidth = 0
 	for i, c := range r.cells {
+		c.style.resolve(passed)
 		c.width, c.height = tracks[i].size, scale(c.ratioY, largest, height)
+		r.cellsWidth += max(c.width, 0)
 	}
 	r.tracks = tracks
+}
+
+// shownWidth returns the columns the rendered row takes: its cells, cut at the row's
+// edge, inside its frame.
+func (r *Row) shownWidth() int {
+	width, _ := r.contentSize()
+	f := r.style.frame
+	return min(r.cellsWidth, width) + f.edgeX + f.paddingX
+}
+
+// contentBounds returns the rectangle the cells of the row show in.
+func (r *Row) contentBounds() image.Rectangle {
+	x, y := r.style.frame.inner(r.x, r.y)
+	width, height := r.contentSize()
+	return image.Rect(x, y, x+min(r.cellsWidth, width), y+height)
+}
+
+// place puts the row's top left corner at x and y in the box and its cells side by side
+// inside its frame.
+func (r *Row) place(x, y int) {
+	r.x, r.y = x, y
+	x, y = r.style.frame.inner(x, y)
+	for _, c := range r.cells {
+		c.x, c.y = x, y
+		x += max(c.width, 0)
+	}
 }
 
 // render returns the row as a block of exactly its height, building it only when its

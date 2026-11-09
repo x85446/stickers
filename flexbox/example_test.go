@@ -187,3 +187,28 @@ func ExampleFlexBox_ForceRecalculate() {
 	// row 0: 10x2 20x2
 	// row 1: 30x8
 }
+
+// CellAt turns a point, such as the X and Y of a mouse click, into the cell that shows
+// there. The bounds of the cell tell where it is and where its content starts.
+func ExampleFlexBox_CellAt() {
+	box := flexbox.New(20, 4)
+	box.AddRows([]*flexbox.Row{
+		box.NewRow().AddCells(
+			flexbox.NewCell(1, 1).SetID("menu").SetStyle(border),
+			flexbox.NewCell(1, 1).SetID("main").SetStyle(border),
+		),
+	})
+	box.Render()
+
+	if cell := box.CellAt(14, 2); cell != nil {
+		fmt.Println("clicked:", cell.GetID())
+		fmt.Println("cell:", cell.GetBounds())
+		fmt.Println("content:", cell.GetContentBounds())
+	}
+	fmt.Println("outside the box:", box.CellAt(40, 2) == nil)
+	// Output:
+	// clicked: main
+	// cell: (10,0)-(20,4)
+	// content: (11,1)-(19,3)
+	// outside the box: true
+}

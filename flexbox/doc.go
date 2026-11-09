@@ -74,6 +74,17 @@
 // the size of its last place. A nil row, column or cell is left out wherever one is
 // added or set.
 //
+// # Positions
+//
+// GetBounds on a cell, row or column returns the rectangle the last layout gave it,
+// counted in columns and lines from the top left corner of its box. GetContentBounds on
+// a cell returns the rectangle inside its border and margins. CellAt returns the cell
+// that shows at a point, which turns the position of a mouse click into a cell.
+//
+// The coordinates belong to the box. A box that renders somewhere else than at the top
+// left corner of the screen has its own position to add: a box nested in a cell starts
+// at the GetContentBounds of that cell.
+//
 // # Nesting
 //
 // A content generator receives the area inside the cell's border and margins. A box, a

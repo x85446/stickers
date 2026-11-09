@@ -1,6 +1,10 @@
 package flexbox
 
-import "charm.land/lipgloss/v2"
+import (
+	"image"
+
+	"charm.land/lipgloss/v2"
+)
 
 // HorizontalFlexBox is a responsive grid of columns, each holding cells stacked
 // vertically. Columns sit side by side and share the box width by ratio or fixed size.
@@ -173,6 +177,7 @@ func (b *HorizontalFlexBox) Render() string {
 		}
 		b.parts = append(b.parts, part)
 	}
+	b.place()
 	if !stale {
 		return b.out
 	}
@@ -181,15 +186,8 @@ func (b *HorizontalFlexBox) Render() string {
 	// Columns that leave spare room are placed in it; columns wider than the box are
 	// cut at its edge.
 	width, height := b.contentSize()
-	left, right := 0, width
-	for _, part := range b.parts {
-		right -= part.width
-	}
-	if right > 0 {
-		left = right - offset(right, 1-b.columnAlign)
-		right -= left
-	}
-	b.frame.join(b.parts, height, left, max(right, 0))
+	left, right := b.spare()
+	b.frame.join(b.parts, height, left, right)
 	b.frame.clip(width)
 	if !b.style.plain() {
 		f := b.style.frame
@@ -200,13 +198,67 @@ func (b *HorizontalFlexBox) Render() string {
 	return b.out
 }
 
-// ForceRecalculate lays out the box and every column now, so the sizes of columns and
-// cells can be read before the next render.
+// ForceRecalculate lays out the box and every column now, so the sizes and positions of
+// columns and cells can be read before the next render.
 func (b *HorizontalFlexBox) ForceRecalculate() {
 	b.layout()
 	passed := b.style.passed()
 	for _, column := range b.columns {
 		column.layout(passed)
+	}
+	b.place()
+}
+
+// CellAt returns the cell that shows at column x and line y of the box, counted from the
+// box's top left corner, or nil when no cell shows there: on a frame, beside a cell
+// narrower than its column, or outside the box. It answers for the box as it is now,
+// which is what the last render showed unless something changed since.
+func (b *HorizontalFlexBox) CellAt(x, y int) *Cell {
+	b.ForceRecalculate()
+	point := image.Pt(x, y)
+	inside := b.contentBounds()
+	for _, column := range b.columns {
+		if !point.In(column.contentBounds().Intersect(inside)) {
+			continue
+		}
+		for _, cell := range column.cells {
+			if point.In(cell.GetBounds()) {
+				return cell
+			}
+		}
+	}
+	return nil
+}
+
+// contentBounds returns the rectangle the columns show in, inside the box's frame.
+func (b *HorizontalFlexBox) contentBounds() image.Rectangle {
+	x, y := b.style.frame.inner(0, 0)
+	width, height := b.contentSize()
+	return image.Rect(x, y, x+width, y+height)
+}
+
+// spare returns the columns left and right of the columns of the box when together they
+// are narrower than it, split the way the column alignment says.
+func (b *HorizontalFlexBox) spare() (left, right int) {
+	right, _ = b.contentSize()
+	for _, column := range b.columns {
+		right -= max(column.width, 0)
+	}
+	if right <= 0 {
+		return 0, 0
+	}
+	left = right - offset(right, 1-b.columnAlign)
+	return left, right - left
+}
+
+// place positions the columns and their cells in the box, the way Render joins them.
+func (b *HorizontalFlexBox) place() {
+	x, y := b.style.frame.inner(0, 0)
+	left, _ := b.spare()
+	x += left
+	for _, column := range b.columns {
+		column.place(x, y)
+		x += max(column.width, 0)
 	}
 }
 

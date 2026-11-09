@@ -50,18 +50,30 @@ type inherited struct {
 	id    uint64 // identity of style; 0 when the parent passes nothing
 }
 
-// frame holds the sizes of a style's margins, border and padding.
+// frame holds the sizes of a style's margins, border and padding, and where the style
+// aligns what it holds.
 type frame struct {
 	top, bottom int // margin plus border above and below the content
+	left        int // margin plus border left of the content
 	edgeX       int // margin plus border, left and right together
 	marginX     int // left and right margin together
 	marginY     int // top and bottom margin together
 	paddingX    int // left and right padding together
 	paddingY    int // top and bottom padding together
+	paddingLeft int
+	paddingTop  int
+
+	alignX, alignY lipgloss.Position
 }
 
 // edgeY returns the lines the margins and border take, above and below together.
 func (f frame) edgeY() int { return f.top + f.bottom }
+
+// inner returns where the children of an element at x and y start: inside its margins,
+// border and padding.
+func (f frame) inner(x, y int) (int, int) {
+	return x + f.left + f.paddingLeft, y + f.top + f.paddingTop
+}
 
 // sized returns style set to render at exactly width by height, margins included.
 // Lipgloss counts the border and the padding into a style's width and height and adds
@@ -110,13 +122,18 @@ func (s *styling) resolve(from inherited) {
 	s.frame = frame{}
 	if s.id != 0 {
 		s.frame = frame{
-			top:      s.effective.GetMarginTop() + s.effective.GetBorderTopSize(),
-			bottom:   s.effective.GetBorderBottomSize() + s.effective.GetMarginBottom(),
-			edgeX:    s.effective.GetHorizontalMargins() + s.effective.GetHorizontalBorderSize(),
-			marginX:  s.effective.GetHorizontalMargins(),
-			marginY:  s.effective.GetVerticalMargins(),
-			paddingX: s.effective.GetHorizontalPadding(),
-			paddingY: s.effective.GetVerticalPadding(),
+			top:         s.effective.GetMarginTop() + s.effective.GetBorderTopSize(),
+			bottom:      s.effective.GetBorderBottomSize() + s.effective.GetMarginBottom(),
+			left:        s.effective.GetMarginLeft() + s.effective.GetBorderLeftSize(),
+			edgeX:       s.effective.GetHorizontalMargins() + s.effective.GetHorizontalBorderSize(),
+			marginX:     s.effective.GetHorizontalMargins(),
+			marginY:     s.effective.GetVerticalMargins(),
+			paddingX:    s.effective.GetHorizontalPadding(),
+			paddingY:    s.effective.GetVerticalPadding(),
+			paddingLeft: s.effective.GetPaddingLeft(),
+			paddingTop:  s.effective.GetPaddingTop(),
+			alignX:      s.effective.GetAlignHorizontal(),
+			alignY:      s.effective.GetAlignVertical(),
 		}
 	}
 	s.resolved, s.resolvedOwn, s.resolvedFrom = true, s.ownID, from.id

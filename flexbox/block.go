@@ -263,3 +263,19 @@ func offset(gap int, pos lipgloss.Position) int {
 	p := math.Min(1, math.Max(0, float64(pos)))
 	return int(math.Round(float64(gap) * p))
 }
+
+// lead returns how many of spare columns or lines lipgloss puts before content that a
+// style aligns at pos: none at the start, half of them at the center, rounded down, and
+// all of them at the end.
+func lead(spare int, pos lipgloss.Position) int {
+	switch {
+	case spare <= 0:
+		return 0
+	case pos == lipgloss.Right:
+		return spare
+	case pos == lipgloss.Center:
+		return spare / 2
+	default:
+		return 0
+	}
+}

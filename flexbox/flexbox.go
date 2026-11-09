@@ -1,6 +1,10 @@
 package flexbox
 
-import "charm.land/lipgloss/v2"
+import (
+	"image"
+
+	"charm.land/lipgloss/v2"
+)
 
 // FlexBox is a responsive grid of rows, each holding cells side by side. Rows stack
 // vertically and share the box height by ratio or fixed size.
@@ -172,6 +176,7 @@ func (b *FlexBox) Render() string {
 		}
 		b.parts = append(b.parts, part)
 	}
+	b.place()
 	if !stale {
 		return b.out
 	}
@@ -195,13 +200,63 @@ func (b *FlexBox) Render() string {
 	return b.out
 }
 
-// ForceRecalculate lays out the box and every row now, so the sizes of rows and cells
-// can be read before the next render.
+// ForceRecalculate lays out the box and every row now, so the sizes and positions of
+// rows and cells can be read before the next render.
 func (b *FlexBox) ForceRecalculate() {
 	b.layout()
 	passed := b.style.passed()
 	for _, row := range b.rows {
 		row.layout(passed)
+	}
+	b.place()
+}
+
+// CellAt returns the cell that shows at column x and line y of the box, counted from the
+// box's top left corner, or nil when no cell shows there: on a frame, in the blank under
+// a cell shorter than its row, or outside the box. It answers for the box as it is now,
+// which is what the last render showed unless something changed since.
+func (b *FlexBox) CellAt(x, y int) *Cell {
+	b.ForceRecalculate()
+	point := image.Pt(x, y)
+	inside := b.contentBounds()
+	for _, row := range b.rows {
+		if !point.In(row.contentBounds().Intersect(inside)) {
+			continue
+		}
+		for _, c := range row.cells {
+			if point.In(c.GetBounds()) {
+				return c
+			}
+		}
+	}
+	return nil
+}
+
+// contentBounds returns the rectangle the rows show in, inside the box's frame.
+func (b *FlexBox) contentBounds() image.Rectangle {
+	x, y := b.style.frame.inner(0, 0)
+	width, height := b.contentSize()
+	return image.Rect(x, y, x+width, y+height)
+}
+
+// place positions the rows and their cells in the box, the way Render stacks them:
+// rows narrower than the widest row sit where the row alignment puts them, and a box
+// with a style moves the rows as a group to where the style aligns them, when they leave
+// columns or lines spare.
+func (b *FlexBox) place() {
+	width, height := b.contentSize()
+	widest, lines := 0, 0
+	for _, row := range b.rows {
+		if row.height > 0 {
+			widest, lines = max(widest, row.shownWidth()), lines+row.height
+		}
+	}
+	f := b.style.frame
+	x, y := f.inner(0, 0)
+	x, y = x+lead(width-widest, f.alignX), y+lead(height-lines, f.alignY)
+	for _, row := range b.rows {
+		row.place(x+offset(widest-row.shownWidth(), b.rowAlign), y)
+		y += max(row.height, 0)
 	}
 }
 

@@ -1,6 +1,7 @@
 package flexbox
 
 import (
+	"image"
 	"strconv"
 	"strings"
 
@@ -23,8 +24,10 @@ type Cell struct {
 	// fixedWidth and fixedHeight replace the ratio when greater than 0
 	fixedWidth, fixedHeight int
 
-	// width and height are the size the last layout gave the cell
+	// width and height are the size the last layout gave the cell, x and y where it
+	// put the cell's top left corner in the box
 	width, height int
+	x, y          int
 
 	// contentGenerator builds the content for the cell's content size
 	contentGenerator func(maxX, maxY int) string
@@ -174,6 +177,22 @@ func (c *Cell) GetWidth() int {
 // generator receives the content area instead.
 func (c *Cell) GetHeight() int {
 	return c.height
+}
+
+// GetBounds returns the rectangle the last layout gave the cell, frame included. It
+// counts columns and lines from the top left corner of the cell's box, so the cell at
+// the corner of a box without a frame starts at (0, 0).
+func (c *Cell) GetBounds() image.Rectangle {
+	return image.Rect(c.x, c.y, c.x+max(c.width, 0), c.y+max(c.height, 0))
+}
+
+// GetContentBounds returns the rectangle inside the cell's border and margins, the area
+// a content generator fills, in the coordinates of GetBounds. It is where to place what
+// the content positions itself, such as a cursor or a box nested in the cell.
+func (c *Cell) GetContentBounds() image.Rectangle {
+	width, height := c.contentSize()
+	x, y := c.x+c.style.frame.left, c.y+c.style.frame.top
+	return image.Rect(x, y, x+width, y+height)
 }
 
 // contentSize returns the area inside the cell's border and margins.

@@ -1,6 +1,10 @@
 package flexbox
 
-import "charm.land/lipgloss/v2"
+import (
+	"image"
+
+	"charm.land/lipgloss/v2"
+)
 
 // Column holds the cells of one column of a HorizontalFlexBox. Its width comes from the
 // box; its cells' widths and heights come from their ratios and fixed sizes. Columns sit
@@ -9,8 +13,10 @@ type Column struct {
 	style styling
 	cells []*Cell
 
-	// width and height are the size the last layout gave the column
+	// width and height are the size the last layout gave the column, x and y where it
+	// put the column's top left corner in the box
 	width, height int
+	x, y          int
 	// fixedWidth replaces the ratio-based width when greater than 0
 	fixedWidth int
 
@@ -107,6 +113,12 @@ func (c *Column) GetHeight() int {
 	return c.height
 }
 
+// GetBounds returns the rectangle the column takes in its box, frame included, counted
+// from the box's top left corner.
+func (c *Column) GetBounds() image.Rectangle {
+	return image.Rect(c.x, c.y, c.x+max(c.width, 0), c.y+max(c.height, 0))
+}
+
 // track returns how the column shares the width of its box: the largest ratioX, minimum
 // width and fixed width among its cells, and its own fixed width.
 func (c *Column) track() track {
@@ -138,10 +150,40 @@ func (c *Column) layout(from inherited) {
 		largest = max(largest, cell.ratioX)
 	}
 	distribute(tracks, height)
+	passed := c.style.passed()
 	for i, cell := range c.cells {
+		cell.style.resolve(passed)
 		cell.width, cell.height = scale(cell.ratioX, largest, width), tracks[i].size
 	}
 	c.tracks = tracks
+}
+
+// contentBounds returns the rectangle the cells of the column show in.
+func (c *Column) contentBounds() image.Rectangle {
+	x, y := c.style.frame.inner(c.x, c.y)
+	width, height := c.contentSize()
+	return image.Rect(x, y, x+width, y+height)
+}
+
+// place puts the column's top left corner at x and y in the box and its cells on top of
+// each other inside its frame. A column with a style moves the cells as a group to where
+// the style aligns them, when they leave columns or lines spare.
+func (c *Column) place(x, y int) {
+	c.x, c.y = x, y
+	width, height := c.contentSize()
+	widest, lines := 0, 0
+	for _, cell := range c.cells {
+		if cell.height > 0 {
+			widest, lines = max(widest, cell.width), lines+cell.height
+		}
+	}
+	f := c.style.frame
+	x, y = f.inner(x, y)
+	x, y = x+lead(width-widest, f.alignX), y+lead(height-lines, f.alignY)
+	for _, cell := range c.cells {
+		cell.x, cell.y = x, y
+		y += max(cell.height, 0)
+	}
 }
 
 // render returns the column as a block of exactly its width by its height, building it
