@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/x85446/stickers/example/about"
 	"github.com/x85446/stickers/v2/flexbox"
 )
 
@@ -176,16 +177,11 @@ func (m *Model) rebuildFlexBox() {
 	m.flexBox.AddRows([]*flexbox.Row{headerRow, contentRow, footerRow})
 }
 
-var aboutStyle = lipgloss.NewStyle().
-	Padding(2, 4).
-	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("#874BFD")).
-	Background(lipgloss.Color("#1a1a2e"))
-
 // View implements tea.Model
 func (m *Model) View() tea.View {
 	view := tea.NewView(m.render())
 	view.AltScreen = true
+	view.WindowTitle = "Stickers: Fixed Row Heights"
 	return view
 }
 
@@ -198,8 +194,7 @@ func (m *Model) render() string {
 	m.flexBox.SetHeight(m.termHeight)
 	content := m.flexBox.Render()
 	if m.showAbout {
-		overlay := aboutStyle.Render(aboutText)
-		content = lipgloss.Place(m.termWidth, m.termHeight, lipgloss.Center, lipgloss.Center, overlay)
+		content = about.Over(content, aboutText, m.termWidth, m.termHeight)
 	}
 	return content
 }

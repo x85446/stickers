@@ -116,7 +116,7 @@ dev: fmt test build  ## Format, test, and build
 cycle: uninstall clean build install  ## Full clean rebuild
 
 .PHONY: run
-run: build  ## Run all twelve demos in one program: tab / shift+tab cycle, a about, q quit
+run: build  ## Run all thirteen demos in one program: tab / shift+tab cycle, a about, q quit
 	@$(BINARY_DIR)/demo-all $(ARGS)
 
 .PHONY: demo-all
@@ -131,15 +131,15 @@ demo-2:  ## FlexBox Horizontal: columns of cells stacked vertically
 	@cd $(EXAMPLE_DIR) && go run ./demo-2-flex-box-horizontal/cmd
 
 .PHONY: demo-3
-demo-3:  ## FlexBox with Table: a table inside a cell (arrows, ctrl+s sort, enter copy, letters filter)
+demo-3:  ## FlexBox with Table: a table inside a cell (arrows, mouse, ctrl+s sort, enter copy, letters filter)
 	@cd $(EXAMPLE_DIR) && go run ./demo-3-flex-box-with-table/cmd
 
 .PHONY: demo-4
-demo-4:  ## Table Simple String: string columns (arrows, ctrl+s sort, enter select, letters filter)
+demo-4:  ## Table Simple String: string columns (arrows, mouse, ctrl+s sort, enter copy, letters filter)
 	@cd $(EXAMPLE_DIR) && go run ./demo-4-table-simple-string/cmd
 
 .PHONY: demo-5
-demo-5:  ## Table Multi-Type: typed columns that sort numerically (arrows, ctrl+s, enter, letters)
+demo-5:  ## Table Multi-Type: typed columns that sort numerically (arrows, mouse, ctrl+s, enter, letters)
 	@cd $(EXAMPLE_DIR) && go run ./demo-5-table-multi-type/cmd
 
 .PHONY: demo-6
@@ -169,6 +169,10 @@ demo-11:  ## FlexBox Cell Config: change a cell's fixed sizes at run time (C-W s
 .PHONY: demo-12
 demo-12:  ## FlexBox Row Alignment: rows narrower than the box placed left, center or right (r)
 	@cd $(EXAMPLE_DIR) && go run ./demo-12-flex-box-row-align/cmd
+
+.PHONY: demo-13
+demo-13:  ## FlexBox Mouse and Cursor: click a cell to select it, the cursor sits in it (click, arrows)
+	@cd $(EXAMPLE_DIR) && go run ./demo-13-flex-box-mouse/cmd
 
 ##@ Cleanup
 

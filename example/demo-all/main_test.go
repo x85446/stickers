@@ -120,3 +120,69 @@ func checkFits(t *testing.T, m *model, width, height int) {
 		t.Errorf("%s header at %d columns lost its own keys: %q", info.name, width, header)
 	}
 }
+
+// screen returns the lines of the model's view without escape sequences.
+func screen(m *model) []string {
+	return strings.Split(ansiRe.ReplaceAllString(m.View().Content, ""), "\n")
+}
+
+// TestMouseAndCursorAccountForTheHeader: a demo draws under the header line, so a click
+// reaches it one line up and its cursor shows one line down.
+func TestMouseAndCursorAccountForTheHeader(t *testing.T) {
+	m := newModel()
+	m = press(t, m, tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = press(t, m, keySpace)
+	m = press(t, m, keyShiftTab) // the last demo: Mouse and Cursor
+
+	view := m.View()
+	if view.MouseMode != tea.MouseModeCellMotion || view.WindowTitle != "Stickers: Mouse and Cursor" {
+		t.Fatalf("the demo's mouse mode and title do not reach the program: %v, %q", view.MouseMode, view.WindowTitle)
+	}
+	cursorShowsLabel := func(label string) {
+		t.Helper()
+		view := m.View()
+		if view.Cursor == nil {
+			t.Fatal("the demo's cursor does not reach the program")
+		}
+		line := []rune(screen(m)[view.Cursor.Y])
+		if got := string(line[view.Cursor.X : view.Cursor.X+len(label)]); got != label {
+			t.Fatalf("the screen shows %q at the cursor, want %q", got, label)
+		}
+	}
+	cursorShowsLabel("cell 1")
+
+	// click the label of cell 6, wherever it is on screen
+	for y, line := range screen(m) {
+		if x := strings.Index(line, "cell 6"); x >= 0 {
+			m = press(t, m, tea.MouseClickMsg{X: len([]rune(line[:x])), Y: y, Button: tea.MouseLeft})
+		}
+	}
+	cursorShowsLabel("cell 6")
+}
+
+// TestClickSelectsATableRowUnderTheHeader: in a table demo the table's header is on
+// line 1 of the screen and its first row on line 2.
+func TestClickSelectsATableRowUnderTheHeader(t *testing.T) {
+	m := newModel()
+	m = press(t, m, tea.WindowSizeMsg{Width: 100, Height: 30})
+	m = press(t, m, keySpace)
+	for i := 0; i < 3; i++ {
+		m = press(t, m, keyTab) // demo 4: Table Simple String
+	}
+	if !strings.Contains(strings.Join(screen(m), "\n"), "0:0 / 100:") {
+		t.Fatalf("the table's footer does not show the cursor at 0:0:\n%s", strings.Join(screen(m), "\n"))
+	}
+	m = press(t, m, tea.MouseClickMsg{X: 30, Y: 4, Button: tea.MouseLeft})
+	if !strings.Contains(strings.Join(screen(m), "\n"), "1:2 / 100:") {
+		t.Fatalf("a click on line 4, the table's third row, did not move the cursor to 1:2:\n%s", strings.Join(screen(m), "\n"))
+	}
+	m = press(t, m, tea.MouseWheelMsg{X: 30, Y: 4, Button: tea.MouseWheelDown})
+	if !strings.Contains(strings.Join(screen(m), "\n"), "1:3 / 100:") {
+		t.Fatal("the wheel did not move the cursor a row down")
+	}
+	// a click on the table's header line sorts by that column
+	m = press(t, m, tea.MouseClickMsg{X: 30, Y: 1, Button: tea.MouseLeft})
+	if !strings.Contains(screen(m)[1], "▲") {
+		t.Fatalf("a click on the table's header did not sort: %q", screen(m)[1])
+	}
+}

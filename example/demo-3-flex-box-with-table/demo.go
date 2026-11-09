@@ -5,15 +5,16 @@ import (
 	"bytes"
 	"encoding/csv"
 	"fmt"
-	"math"
+	"image"
 	"math/rand"
 	"os"
 	"strings"
-	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/x85446/stickers/example/about"
 	"github.com/x85446/stickers/example/sample"
+	"github.com/x85446/stickers/example/tableinput"
 	"github.com/x85446/stickers/v2/flexbox"
 	"github.com/x85446/stickers/v2/table"
 )
@@ -34,6 +35,7 @@ var (
 type Model struct {
 	flexBox   *flexbox.FlexBox
 	table     *table.Table
+	tableCell *flexbox.Cell // the cell of flexBox that holds the table
 	headers   []string
 	showAbout bool
 	width     int
@@ -46,13 +48,14 @@ Embedded table inside a flexbox layout with CSV data.
 
 Shows how to nest a Table component inside a FlexBox cell.
 The table is placed in the center cell of row 2: the cell's
-content generator sizes the table to the cell and renders it.
+content generator sizes the table to the cell and renders it,
+and the cell's position tells where a mouse click landed in it.
 
 Navigation:
-- Arrow keys: Move cursor in table
-- Ctrl+S: Sort by current column
+- Arrow keys, click, wheel: Move cursor in table
+- Ctrl+S, click a header: Sort by that column
 - Enter/Space: Copy cell value to random flexbox cells
-- Type letters: Filter current column
+- Type letters, paste: Filter current column
 - Backspace: Clear filter character
 
 Press 'a' to close | 'q' to quit`
@@ -87,6 +90,11 @@ func New() *Model {
 	}
 	m.table.SetStylePassing(true)
 
+	// the table takes the size of its cell on every render
+	m.tableCell = flexbox.NewCell(10, 5).SetStyle(styleBlank).SetContentGenerator(func(width, height int) string {
+		return m.table.SetWidth(width).SetHeight(height).Render()
+	})
+
 	r1 := m.flexBox.NewRow().AddCells(
 		flexbox.NewCell(5, 5).SetStyle(style2),
 		flexbox.NewCell(2, 5).SetStyle(style3),
@@ -94,10 +102,7 @@ func New() *Model {
 	).SetStyle(styleRow)
 	r2 := m.flexBox.NewRow().AddCells(
 		flexbox.NewCell(1, 5).SetStyle(style6),
-		// the table takes the size of its cell on every render
-		flexbox.NewCell(10, 5).SetStyle(styleBlank).SetContentGenerator(func(width, height int) string {
-			return m.table.SetWidth(width).SetHeight(height).Render()
-		}),
+		m.tableCell,
 		flexbox.NewCell(1, 5).SetStyle(style6),
 	).SetStyle(styleRow)
 	r3 := m.flexBox.NewRow().AddCells(
@@ -143,82 +148,49 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "a":
 			m.showAbout = !m.showAbout
-			return m, nil
-		case "down":
-			m.table.CursorDown()
-		case "up":
-			m.table.CursorUp()
-		case "left":
-			m.table.CursorLeft()
-		case "right":
-			m.table.CursorRight()
-		case "ctrl+s":
-			x, _ := m.table.GetCursorLocation()
-			_, order := m.table.GetOrder()
-			switch order {
-			case table.SortingOrderAscending:
-				m.table.OrderByDesc(x)
-			case table.SortingOrderDescending:
-				m.table.OrderByAsc(x)
-			}
 		case "enter", "space":
-			cellString := m.table.GetCursorValue()
-			// add content to random boxes on flex box
-			for ir := 0; ir < m.flexBox.RowsLen(); ir++ {
-				// don't' want it on the middle row
-				if ir == 1 {
-					continue
-				}
-				// not handling error for example script
-				for ic := 0; ic < m.flexBox.GetRow(ir).CellsLen(); ic++ {
-					// adding a bit of randomness for fun
-					if rand.Int()%2 == 0 {
-						h := int(math.Floor(float64(m.flexBox.GetRowCellCopy(ir, ic).GetHeight()) / 2.0))
-						m.flexBox.GetRow(ir).GetCell(ic).SetContent(strings.Repeat("\n", h) + cellString)
-					} else {
-						m.flexBox.GetRow(ir).GetCell(ic).SetContent("")
-					}
-				}
-			}
-		case "backspace":
-			m.filterWithStr(msg.String())
+			m.copyToGrid(m.table.GetCursorValue())
 		default:
-			if r := []rune(msg.Text); len(r) == 1 && (unicode.IsLetter(r[0]) || unicode.IsDigit(r[0])) {
-				m.filterWithStr(msg.Text)
-			}
+			tableinput.Update(m.table, msg, m.tableOrigin())
 		}
-
+	case tea.MouseClickMsg, tea.MouseWheelMsg, tea.PasteMsg:
+		tableinput.Update(m.table, msg, m.tableOrigin())
 	}
 	return m, nil
 }
 
-// filterWithStr edits the filter of the cursor's column: a letter or digit extends it and
-// backspace removes its last character.
-func (m *Model) filterWithStr(key string) {
-	column, filter := m.table.GetFilter()
-	x, _ := m.table.GetCursorLocation()
-	switch {
-	case key != "backspace" && x != column:
-		m.table.SetFilter(x, key)
-	case key != "backspace":
-		m.table.SetFilter(column, filter+key)
-	case len(filter) > 1:
-		m.table.SetFilter(column, filter[:len(filter)-1])
-	case len(filter) == 1:
-		m.table.UnsetFilter()
-	}
+// tableOrigin returns where the table's top left corner is on screen: the content area
+// of the cell that holds it. Mouse positions are counted from there.
+func (m *Model) tableOrigin() image.Point {
+	return m.tableCell.GetContentBounds().Min
 }
 
-var aboutStyle = lipgloss.NewStyle().
-	Padding(2, 4).
-	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("#874BFD")).
-	Background(lipgloss.Color("#1a1a2e"))
+// copyToGrid shows the value in about half of the cells around the table, picked at
+// random, and empties the others.
+func (m *Model) copyToGrid(value string) {
+	for ir := 0; ir < m.flexBox.RowsLen(); ir++ {
+		// the middle row holds the table
+		if ir == 1 {
+			continue
+		}
+		row := m.flexBox.GetRow(ir)
+		for ic := 0; ic < row.CellsLen(); ic++ {
+			cell := row.GetCell(ic)
+			if rand.Int()%2 == 0 {
+				cell.SetContent(strings.Repeat("\n", cell.GetHeight()/2) + value)
+			} else {
+				cell.SetContent("")
+			}
+		}
+	}
+}
 
 // View implements tea.Model
 func (m *Model) View() tea.View {
 	view := tea.NewView(m.render())
 	view.AltScreen = true
+	view.MouseMode = tea.MouseModeCellMotion
+	view.WindowTitle = "Stickers: FlexBox with Table"
 	return view
 }
 
@@ -226,8 +198,7 @@ func (m *Model) View() tea.View {
 func (m *Model) render() string {
 	content := m.flexBox.Render()
 	if m.showAbout {
-		overlay := aboutStyle.Render(aboutText)
-		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay)
+		content = about.Over(content, aboutText, m.width, m.height)
 	}
 	return content
 }

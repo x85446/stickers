@@ -3,13 +3,15 @@ package demo5
 
 import (
 	"fmt"
+	"image"
 	"os"
-	"unicode"
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"github.com/gocarina/gocsv"
+	"github.com/x85446/stickers/example/about"
 	"github.com/x85446/stickers/example/sample"
+	"github.com/x85446/stickers/example/tableinput"
 	"github.com/x85446/stickers/v2/flexbox"
 	"github.com/x85446/stickers/v2/table"
 )
@@ -37,10 +39,10 @@ This enables proper numeric sorting: integers sort
 numerically (1, 2, 10) instead of lexically (1, 10, 2).
 
 Navigation:
-- Arrow keys: Move cursor
-- Ctrl+S: Sort by column (numeric or alpha)
-- Enter/Space: Select cell value
-- Type to filter
+- Arrow keys, click, wheel: Move cursor
+- Ctrl+S, click a header: Sort by that column (numeric or alpha)
+- Enter/Space: Copy cell value to the clipboard
+- Type or paste to filter
 
 Press 'a' to close | 'q' to quit`
 
@@ -93,11 +95,11 @@ func New() *Model {
 
 	// setup info box
 	infoText := `
-use the arrows to navigate
-ctrl+s: sort by current column
-alphanumerics: filter column
-enter, spacebar: get column value
-ctrl+c: quit
+arrows, click, wheel: move the cursor
+ctrl+s, click a header: sort
+letters, digits, paste: filter
+enter, space: copy the cell
+q: quit
 `
 	r1 := m.infoBox.NewRow()
 	r1.AddCells(
@@ -142,66 +144,27 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "a":
 			m.showAbout = !m.showAbout
-			return m, nil
-		case "down":
-			m.table.CursorDown()
-		case "up":
-			m.table.CursorUp()
-		case "left":
-			m.table.CursorLeft()
-		case "right":
-			m.table.CursorRight()
-		case "ctrl+s":
-			x, _ := m.table.GetCursorLocation()
-			_, order := m.table.GetOrder()
-			switch order {
-			case table.SortingOrderAscending:
-				m.table.OrderByDesc(x)
-			case table.SortingOrderDescending:
-				m.table.OrderByAsc(x)
-			}
 		case "enter", "space":
+			// the value goes to the info box and to the system clipboard
 			selectedValue = m.table.GetCursorValue()
 			m.infoBox.GetRow(0).GetCell(1).SetContent("\nselected cell: " + selectedValue)
-		case "backspace":
-			m.filterWithStr(msg.String())
+			return m, tea.SetClipboard(selectedValue)
 		default:
-			if r := []rune(msg.Text); len(r) == 1 && (unicode.IsLetter(r[0]) || unicode.IsDigit(r[0])) {
-				m.filterWithStr(msg.Text)
-			}
+			tableinput.Update(m.table, msg, image.Point{})
 		}
-
+	case tea.MouseClickMsg, tea.MouseWheelMsg, tea.PasteMsg:
+		// the table is at the top left corner of the screen
+		tableinput.Update(m.table, msg, image.Point{})
 	}
 	return m, nil
 }
-
-// filterWithStr edits the filter of the cursor's column: a letter or digit extends it and
-// backspace removes its last character.
-func (m *Model) filterWithStr(key string) {
-	column, filter := m.table.GetFilter()
-	x, _ := m.table.GetCursorLocation()
-	switch {
-	case key != "backspace" && x != column:
-		m.table.SetFilter(x, key)
-	case key != "backspace":
-		m.table.SetFilter(column, filter+key)
-	case len(filter) > 1:
-		m.table.SetFilter(column, filter[:len(filter)-1])
-	case len(filter) == 1:
-		m.table.UnsetFilter()
-	}
-}
-
-var aboutStyle = lipgloss.NewStyle().
-	Padding(2, 4).
-	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("#874BFD")).
-	Background(lipgloss.Color("#1a1a2e"))
 
 // View implements tea.Model
 func (m *Model) View() tea.View {
 	view := tea.NewView(m.render())
 	view.AltScreen = true
+	view.MouseMode = tea.MouseModeCellMotion
+	view.WindowTitle = "Stickers: Table Multi-Type"
 	return view
 }
 
@@ -209,8 +172,7 @@ func (m *Model) View() tea.View {
 func (m *Model) render() string {
 	content := lipgloss.JoinVertical(lipgloss.Left, m.table.Render(), m.infoBox.Render())
 	if m.showAbout {
-		overlay := aboutStyle.Render(aboutText)
-		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay)
+		content = about.Over(content, aboutText, m.width, m.height)
 	}
 	return content
 }

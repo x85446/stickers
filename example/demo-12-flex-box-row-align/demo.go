@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
+	"github.com/x85446/stickers/example/about"
 	"github.com/x85446/stickers/v2/flexbox"
 )
 
@@ -216,16 +217,11 @@ func (m *Model) rebuildFlexBox() {
 	m.flexBox.ForceRecalculate()
 }
 
-var aboutStyle = lipgloss.NewStyle().
-	Padding(2, 4).
-	Border(lipgloss.RoundedBorder()).
-	BorderForeground(lipgloss.Color("#874BFD")).
-	Background(lipgloss.Color("#1a1a2e"))
-
 // View implements tea.Model
 func (m *Model) View() tea.View {
 	view := tea.NewView(m.render())
 	view.AltScreen = true
+	view.WindowTitle = "Stickers: Row Alignment"
 	return view
 }
 
@@ -233,8 +229,7 @@ func (m *Model) View() tea.View {
 func (m *Model) render() string {
 	content := m.flexBox.Render()
 	if m.showAbout {
-		overlay := aboutStyle.Render(aboutText)
-		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay)
+		content = about.Over(content, aboutText, m.width, m.height)
 	}
 	return content
 }
