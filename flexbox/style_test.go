@@ -171,10 +171,10 @@ func TestIsolateLinks(t *testing.T) {
 		{"closed on its line", []string{a + "x" + closed + "y"}, []string{a + "x" + closed + "y"}},
 		{"open over three lines", []string{a + "x", "y", "z" + closed + "w", "v"},
 			[]string{a + "x" + closed, a + "y" + closed, a + "z" + closed + "w", "v"}},
-		{"a link inside another", []string{a + "x" + b + "y" + closed + "z" + closed + "w"},
-			[]string{a + "x" + b + "y" + closed + a + "z" + closed + "w"}},
-		{"an inner link over a line end", []string{a + "x" + b + "y", "z" + closed + "w", "v" + closed},
-			[]string{a + "x" + b + "y" + closed, b + "z" + closed + a + "w" + closed, a + "v" + closed}},
+		{"a second link replaces the first and its close ends both", []string{a + "x" + b + "y" + closed + "z", "w"},
+			[]string{a + "x" + b + "y" + closed + "z", "w"}},
+		{"a second link over a line end", []string{a + "x" + b + "y", "z" + closed + "w"},
+			[]string{a + "x" + b + "y" + closed, b + "z" + closed + "w"}},
 		{"a close without an open", []string{"x" + closed + "y"}, []string{"x" + closed + "y"}},
 		{"never closed", []string{a + "x", "y"}, []string{a + "x" + closed, a + "y" + closed}},
 	} {
@@ -276,6 +276,63 @@ func TestUnderlineRunsThroughStyledContent(t *testing.T) {
 	row.AddRows([]*Row{row.NewRow().SetStyle(under).AddCells(NewCell(1, 1).SetContent("ab"), NewCell(1, 1).SetContent(red))})
 	if rendered := row.Render(); !strings.HasPrefix(rendered, on+"ab") || ansi.Strip(rendered) != "ab    red   " {
 		t.Errorf("an underlined row with a colored cell renders %q", rendered)
+	}
+}
+
+// TestLinesResumeAfterAnySequenceThatEndsThem: the underline of an element comes back
+// after content turns it off in any way, and a row that passes it has no gap after a
+// styled cell.
+func TestLinesResumeAfterAnySequenceThatEndsThem(t *testing.T) {
+	on, off := "\x1b[4m", "\x1b[24m"
+	for _, end := range []string{"\x1b[m", "\x1b[0m", "\x1b[00m", "\x1b[24m", "\x1b[29m", "\x1b[59m", "\x1b[4:0m", "\x1b[01;00m"} {
+		if got := relined("a"+end+"b", on, off); got != on+"a"+end+on+"b"+off {
+			t.Errorf("after %q the line does not resume: %q", end, got)
+		}
+	}
+	for _, keep := range []string{"\x1b[31m", "\x1b[39m", "\x1b[38;5;0m", "\x1b[38;2;0;0;0m", "\x1b[4:3m", "\x1b[38:2::0:0:0m", "\x1b[1;34m"} {
+		if got := relined("a"+keep+"b", on, off); got != on+"a"+keep+"b"+off {
+			t.Errorf("after %q the line is written again: %q", keep, got)
+		}
+	}
+
+	red := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Render("red")
+	box := New(24, 1)
+	box.AddRows([]*Row{box.NewRow().UseStyle(lipgloss.NewStyle().Underline(true)).AddCells(
+		NewCell(1, 1).SetContent("ab"), NewCell(1, 1).SetContent(red), NewCell(1, 1).SetContent("cd"))})
+	// follow the underline through the line: every column of text and padding has it
+	underlined, lined := 0, false
+	for rest := box.Render(); rest != ""; {
+		if strings.HasPrefix(rest, "\x1b[") {
+			end := strings.IndexByte(rest, 'm')
+			params := rest[2:end]
+			switch {
+			case strings.HasPrefix(params, "4"):
+				lined = true
+			case resetsAttributes(params):
+				lined = false
+			}
+			rest = rest[end+1:]
+			continue
+		}
+		if lined {
+			underlined++
+		}
+		rest = rest[1:]
+	}
+	if underlined != 24 {
+		t.Errorf("%d of 24 columns are underlined in %q", underlined, box.Render())
+	}
+}
+
+// TestTwoLinksInOneCell: a second link in a cell's content replaces the first, and its
+// close ends linking, as on a terminal.
+func TestTwoLinksInOneCell(t *testing.T) {
+	a, b, off := "\x1b]8;;https://a\a", "\x1b]8;;https://b\a", ansi.ResetHyperlink()
+	box := New(16, 2)
+	box.AddRows([]*Row{box.NewRow().AddCells(NewCell(1, 1).SetContent(a + "one" + b + "two" + off + " three\nnext line"))})
+	got := lines(box)
+	if strings.Contains(got[1], linkStart) || !strings.HasSuffix(got[0], off+" three    ") {
+		t.Errorf("text after the close is linked: %q", got)
 	}
 }
 

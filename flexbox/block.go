@@ -39,50 +39,34 @@ func resize(revs []uint64, n int) []uint64 {
 // linkStart begins the escape sequence that opens or closes a hyperlink.
 const linkStart = "\x1b]8;"
 
-// isolateLinks makes every line open and close its own hyperlinks. A hyperlink stays
+// isolateLinks makes every line open and close its own hyperlink. A hyperlink stays
 // open until it is closed, also across line ends, so in a line of a block that sits
 // beside other blocks it would take in what follows on the same line of the screen.
-//
-// A link that opens inside another, such as a cell's inside its row's, ends both when it
-// closes; the outer one is opened again after it.
+// One link is open at a time: a new one replaces it and a close ends it.
 func isolateLinks(lines []string) {
-	var open []string // the sequences of the links open at this point, outermost first
+	open := "" // the sequence of the link open at this point
 	for i, line := range lines {
-		if len(open) == 0 && !strings.Contains(line, linkStart) {
-			continue
-		}
-		var b strings.Builder
-		if len(open) > 0 {
-			b.WriteString(open[len(open)-1])
-		}
-		for {
-			start := strings.Index(line, linkStart)
+		before := open
+		for rest := line; ; {
+			start := strings.Index(rest, linkStart)
 			if start < 0 {
 				break
 			}
-			sequence, address := linkSequence(line[start:])
+			sequence, address := linkSequence(rest[start:])
 			if sequence == "" {
 				break
 			}
-			b.WriteString(line[:start+len(sequence)])
-			line = line[start+len(sequence):]
+			open = ""
 			if address != "" {
-				open = append(open, sequence)
-				continue
+				open = sequence
 			}
-			// no address closes the link
-			if len(open) > 0 {
-				open = open[:len(open)-1]
-			}
-			if len(open) > 0 {
-				b.WriteString(open[len(open)-1])
-			}
+			rest = rest[start+len(sequence):]
 		}
-		b.WriteString(line)
-		if len(open) > 0 {
-			b.WriteString(ansi.ResetHyperlink())
+		line = before + line
+		if open != "" {
+			line += ansi.ResetHyperlink()
 		}
-		lines[i] = b.String()
+		lines[i] = line
 	}
 }
 

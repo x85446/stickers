@@ -102,6 +102,8 @@ type styling struct {
 	runeByRune bool
 	linesOn    string
 	linesOff   string
+	// link is the sequence that opens the hyperlink of effective, if it has one
+	link string
 
 	// what effective was resolved from
 	resolved     bool
@@ -126,11 +128,15 @@ func (s *styling) resolve(from inherited) {
 		s.effective = s.own.Inherit(*from.style)
 		s.id = nextID()
 	}
-	s.frame, s.runeByRune, s.linesOn, s.linesOff = frame{}, false, "", ""
+	s.frame, s.runeByRune, s.linesOn, s.linesOff, s.link = frame{}, false, "", "", ""
 	if s.id != 0 {
 		s.runeByRune = s.effective.GetUnderline() || s.effective.GetStrikethrough() ||
 			s.effective.GetUnderlineSpaces() || s.effective.GetStrikethroughSpaces()
 		s.linesOn, s.linesOff = lineSequences(s.effective)
+		s.link = ""
+		if link, params := s.effective.GetHyperlink(); link != "" {
+			s.link = ansi.SetHyperlink(link, params)
+		}
 		s.frame = frame{
 			top:         s.effective.GetMarginTop() + s.effective.GetBorderTopSize(),
 			bottom:      s.effective.GetBorderBottomSize() + s.effective.GetMarginBottom(),
@@ -156,7 +162,13 @@ func (s *styling) resolve(from inherited) {
 // cells of a row. For such content the style is returned without the two, and the
 // content with the sequences that draw them written around every line, and again after
 // every reset inside it. Content without escape sequences is left to lipgloss.
+//
+// A hyperlink of the style ends where content closes a link of its own, a cell's inside
+// its row's. It is opened again after every such close.
 func (s *styling) dress(content string) (lipgloss.Style, string) {
+	if s.link != "" && strings.Contains(content, linkStart) {
+		content = relinked(content, s.link)
+	}
 	if !s.runeByRune || !strings.Contains(content, "\x1b") {
 		return s.effective, content
 	}
@@ -164,6 +176,29 @@ func (s *styling) dress(content string) (lipgloss.Style, string) {
 		UnsetUnderline().UnsetUnderlineSpaces().
 		UnsetStrikethrough().UnsetStrikethroughSpaces()
 	return style, relined(content, s.linesOn, s.linesOff)
+}
+
+// relinked writes open, the sequence of a hyperlink around text, again after every
+// sequence in text that closes a link.
+func relinked(text, open string) string {
+	var b strings.Builder
+	for {
+		start := strings.Index(text, linkStart)
+		if start < 0 {
+			break
+		}
+		sequence, address := linkSequence(text[start:])
+		if sequence == "" {
+			break
+		}
+		b.WriteString(text[:start+len(sequence)])
+		if address == "" {
+			b.WriteString(open)
+		}
+		text = text[start+len(sequence):]
+	}
+	b.WriteString(text)
+	return b.String()
 }
 
 // lineSequences returns the escape sequences that start and end the underline and the
@@ -228,13 +263,14 @@ func relined(text, on, off string) string {
 	return b.String()
 }
 
-// resetsAttributes reports whether the parameters of a text attribute sequence turn
-// every attribute off: one of them is empty or 0, outside the numbers of a color.
+// resetsAttributes reports whether the parameters of a text attribute sequence end an
+// underline or a strikethrough: a parameter outside the numbers of a color resets every
+// attribute (empty or 0) or turns one of the lines off (24, 29, 59 or 4:0).
 func resetsAttributes(params string) bool {
 	fields := strings.Split(params, ";")
 	for i := 0; i < len(fields); i++ {
-		switch fields[i] {
-		case "", "0":
+		switch strings.TrimLeft(fields[i], "0") {
+		case "", "24", "29", "59", "4:0":
 			return true
 		case "38", "48", "58":
 			// a color follows as 5;n or 2;r;g;b
