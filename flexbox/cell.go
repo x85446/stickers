@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/cellbuf"
 )
 
@@ -89,9 +90,9 @@ func (c *Cell) SetContent(content string) *Cell {
 }
 
 // SetContentGenerator sets a function that builds the content each time the cell
-// renders. It receives the width and height inside the border and margins, never less
-// than 0; padding, if the style has any, lies inside that area. A cell without columns
-// or lines does not call it.
+// renders. It receives the width and height the content has room for, inside the cell's
+// margins, border and padding, never less than 0. A cell without columns or lines does
+// not call it.
 func (c *Cell) SetContentGenerator(generator func(maxX, maxY int) string) *Cell {
 	c.contentGenerator = generator
 	return c
@@ -175,9 +176,11 @@ func (c *Cell) GetHeight() int {
 	return c.height
 }
 
-// contentSize returns the area inside the cell's border and margins.
+// contentSize returns the room the content has, inside the cell's margins, border and
+// padding.
 func (c *Cell) contentSize() (width, height int) {
-	return max(c.width-c.style.frame.edgeX, 0), max(c.height-c.style.frame.edgeY(), 0)
+	f := c.style.frame
+	return max(c.width-f.edgeX-f.paddingX, 0), max(c.height-f.edgeY()-f.paddingY, 0)
 }
 
 // render returns the cell as a block of exactly its width by its height, building it
@@ -208,10 +211,8 @@ func (c *Cell) render(from inherited) *block {
 	default:
 		f := c.style.frame
 		contentWidth, contentHeight := width-f.edgeX, height-f.edgeY()
-		style := c.style.effective.
-			Width(contentWidth).MaxWidth(width).
-			Height(contentHeight)
-		text := renderStyled(style, fitContent(content, contentWidth-f.paddingX, contentHeight-f.paddingY))
+		style, fitted := c.style.dress(fitContent(content, contentWidth-f.paddingX, contentHeight-f.paddingY))
+		text := renderStyled(style.Width(contentWidth).MaxWidth(width).Height(contentHeight), fitted)
 		c.out.fill(text, width, height, f.top, f.bottom)
 	}
 	return &c.out
@@ -266,8 +267,12 @@ func fitContent(content string, width, height int) string {
 		content = strings.ReplaceAll(content, "\r\n", "\n")
 	}
 	// the wrap drops the spaces at the very end of its input; a newline after the
-	// last line keeps them
-	wrapped := strings.TrimSuffix(wrap(content+"\n", width), "\n")
+	// last line keeps them. After that newline the wrap writes nothing but the escape
+	// sequences of a color or link the content left open, which go with it.
+	wrapped := wrap(content+"\n", width)
+	if last := strings.LastIndexByte(wrapped, '\n'); last >= 0 && ansi.Strip(wrapped[last+1:]) == "" {
+		wrapped = wrapped[:last]
+	}
 	return firstLines(wrapped, height)
 }
 

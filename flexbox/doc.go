@@ -78,8 +78,9 @@
 //
 // # Nesting
 //
-// A content generator receives the area inside the cell's border and margins. A box, a
-// table or any other component nests in a cell by taking that size and rendering:
+// A content generator receives the room its content has, inside the cell's margins,
+// border and padding. A box, a table or any other component nests in a cell by taking
+// that size and rendering:
 //
 //	cell.SetContentGenerator(func(width, height int) string {
 //		return inner.SetWidth(width).SetHeight(height).Render()

@@ -52,10 +52,6 @@ func (t *Table) newSlotCell(s *slot, i int) *flexbox.Cell {
 	return flexbox.NewCell(t.columnRatio[column], 1).
 		SetMinWidth(t.columnMinWidth[column]).
 		SetContentGenerator(func(width, _ int) string {
-			if s.cursor == i {
-				// the padding of the cursor cell's style lies inside the cell's area
-				width -= t.cursorPadding
-			}
 			if s.widths[i] != width {
 				s.fitted[i], s.widths[i] = cut(s.texts[i], width), width
 			}

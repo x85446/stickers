@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - The cursor of a table sits on the last row only while a filter hides its own row, and is back on its row when the filter goes. It used to stay on the row the filter moved it to.
 - `Table.SetTypes` returns an `ErrorRowLen` for a wrong number of types. The messages of the table's errors start with `table:`.
 - A minimum width or height holds next to fixed sizes that leave nothing. It used to drop to 0 there.
+- A content generator receives the room its content has, inside the cell's padding too. It used to receive the padding's columns and lines as well, so a generator that filled its area in a padded cell was wrapped.
 - `SetRows` and `SetColumns` copy the slice they are given.
 - Lip Gloss v1.1.0 is the minimum version, up from v0.13.0.
 ### Fixes
@@ -32,6 +33,9 @@ All notable changes to this project will be documented in this file.
 - Content with Windows line ends leaves no carriage return in a cell.
 - A bordered row too short for its cells closes its frame over its full width instead of two columns.
 - A nil row, column or cell, such as a getter returns for an index that is not there, is left out instead of causing a panic at the next render.
+- A cell, row, column or box that underlines or strikes through keeps styled content whole and draws its line through it. Lip Gloss writes the two one rune at a time, which cut the escape sequences of colored content apart and showed them as text.
+- Content that ends inside a color or a hyperlink takes no extra line, so it sits where plain content sits when it is centered or at the bottom.
+- A row whose frame alone is wider than its box is cut at the box's edge and leaves the other rows in place.
 - `Render` returns exactly the box's height in lines and width in columns for every size and style.
 #### table
 - `SetFilter`, `OrderByAsc` and `OrderByDesc` ignore a negative index. They used to panic.
@@ -47,6 +51,7 @@ All notable changes to this project will be documented in this file.
 - A table without columns renders. It used to panic.
 - `SetWidth` with the width the table already has changes nothing. It used to choose the visible columns again from the cursor's column, which scrolled a table that is sized on every render.
 - The table is its size whatever frame the footer's style has; a border or padding on it used to add lines.
+- A table without width renders the number of lines of its current height.
 - A value is cut to the room its cell has: the padding of the cursor cell's style, tabs and Windows line ends are counted, so a cut value always ends in `…`.
 - `int64` columns are accepted by `SetTypes` and `AddRows`, as `Ordered` always listed them.
 - `SetStyles` overrides apply to that table only; the package defaults and other tables keep their styles.

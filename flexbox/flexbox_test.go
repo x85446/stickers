@@ -281,8 +281,9 @@ func TestContentGeneratorGetsTheContentArea(t *testing.T) {
 	box := New(20, 10)
 	box.AddRows([]*Row{box.NewRow().AddCells(cell)})
 	box.Render()
-	if gotWidth != 16 || gotHeight != 6 {
-		t.Fatalf("generator got %dx%d, want 16x6", gotWidth, gotHeight)
+	// 20x10 less a margin of 1, a border of 1 and a padding of 1 left and right
+	if gotWidth != 14 || gotHeight != 6 {
+		t.Fatalf("generator got %dx%d, want 14x6", gotWidth, gotHeight)
 	}
 	if w, h := cell.GetWidth(), cell.GetHeight(); w != 20 || h != 10 {
 		t.Fatalf("cell is %dx%d, want 20x10", w, h)
@@ -472,4 +473,21 @@ func TestSetRowsKeepsItsOwnList(t *testing.T) {
 	assertLines(t, lines(box), "a   ", "b   ")
 	box.SetRows(rows[:1])
 	assertLines(t, lines(box), "b   ", "    ")
+}
+
+// TestRowFrameWiderThanTheBoxIsCut: a row whose frame alone is wider than the box is cut
+// at the box's edge and leaves the rows that fit where they are.
+func TestRowFrameWiderThanTheBoxIsCut(t *testing.T) {
+	for _, boxStyle := range []lipgloss.Style{lipgloss.NewStyle(), lipgloss.NewStyle().Bold(true)} {
+		box := New(8, 6).SetRowAlign(lipgloss.Right).SetStyle(boxStyle)
+		box.AddRows([]*Row{
+			box.NewRow().AddCells(NewCell(1, 1).SetContent("AAAAAAAA\nAAAAAAAA")),
+			box.NewRow().SetStyle(bordered().Padding(0, 4)).AddCells(NewCell(1, 1)),
+		})
+		rendered := box.Render()
+		assertSize(t, rendered, 8, 6)
+		if got := strings.Split(rendered, "\n"); got[0] != "AAAAAAAA" || got[1] != "AAAAAAAA" {
+			t.Fatalf("the row that fits renders %q and %q", got[0], got[1])
+		}
+	}
 }

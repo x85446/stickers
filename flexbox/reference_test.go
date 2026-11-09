@@ -90,7 +90,7 @@ func referenceCell(cell *Cell, parent lipgloss.Style, passing bool) string {
 	height := cell.height - top - bottom
 	var content string
 	if cell.contentGenerator != nil {
-		content = cell.contentGenerator(max(width, 0), max(height, 0))
+		content = cell.contentGenerator(max(width-style.GetHorizontalPadding(), 0), max(height-style.GetVerticalPadding(), 0))
 	}
 	fitted := fitContent(content, width-style.GetHorizontalPadding(), height-style.GetVerticalPadding())
 	rendered := renderStyled(style.Width(width).MaxWidth(cell.width).Height(height), fitted)

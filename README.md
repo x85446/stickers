@@ -174,14 +174,17 @@ whatever the rows and cells ask for.
 
 - `cell.SetContent(s)` sets static text.
 - `cell.SetContentGenerator(func(w, h int) string)` builds the text each time
-  the box renders. `w` and `h` are the area inside the border and margins,
-  never less than 0, so the generator can lay out text for the space it has.
-  Padding, if the style has any, is inside that area. A cell without columns
-  or lines does not call its generator.
+  the box renders. `w` and `h` are the room the content has, inside the cell's
+  margins, border and padding, never less than 0, so the generator can lay out
+  text for the space it has. A cell without columns or lines does not call its
+  generator.
 - `cell.GetWidth()` and `cell.GetHeight()` return the full allocated size,
   including the frame.
 - Content keeps its alignment: the style's horizontal and vertical alignment
   place it, and trailing spaces count as part of a line.
+- Content can carry its own colors. They end with the cell on every line, and
+  a cell or row that underlines or strikes through draws its line through
+  colored content too.
 
 ### Styles
 

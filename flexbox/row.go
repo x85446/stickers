@@ -181,8 +181,10 @@ func (r *Row) render(from inherited) *block {
 			content = spaces(r.out.width)
 		}
 		f := r.style.frame
-		text := r.style.effective.Height(key.height - f.edgeY()).Render(content)
-		r.out.fill(text, textWidth(text), key.height, f.top, f.bottom)
+		style, content := r.style.dress(content)
+		text := style.Height(key.height - f.edgeY()).Render(content)
+		// a frame wider than the row is cut at the row's edge like its cells
+		r.out.fill(text, min(textWidth(text), key.width), key.height, f.top, f.bottom)
 	}
 	return &r.out
 }

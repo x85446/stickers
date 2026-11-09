@@ -775,3 +775,15 @@ func TestNewTableCopiesItsHeaders(t *testing.T) {
 		t.Fatalf("header %q, want %q", got, "A   B ▲ ")
 	}
 }
+
+// TestRenderFollowsTheHeightWithoutWidth: a table without columns to show renders its
+// current number of lines.
+func TestRenderFollowsTheHeightWithoutWidth(t *testing.T) {
+	tb := NewTable(0, 1, []string{"A"}).MustAddRows([][]any{{"a"}})
+	for _, height := range []int{1, 3, 2, 5, 1} {
+		got := tb.SetHeight(height).Render()
+		if n := strings.Count(got, "\n") + 1; n != height || lipgloss.Width(got) != 0 {
+			t.Fatalf("at %d lines the table renders %d lines of %d columns: %q", height, n, lipgloss.Width(got), got)
+		}
+	}
+}
