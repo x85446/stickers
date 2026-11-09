@@ -42,6 +42,54 @@ func (t *Table) CursorRight() *Table {
 	return t
 }
 
+// SetCursorLocation moves the cursor to the column and to the row, both counted from 0,
+// the row over the rows the filter keeps. A value out of range moves it to the nearest
+// column or row. The table scrolls to show the cursor.
+func (t *Table) SetCursorLocation(column, row int) *Table {
+	t.settle()
+	if column = max(min(column, len(t.columnHeaders)-1), 0); column != t.cursorIndexX {
+		t.cursorMovedRight = column > t.cursorIndexX
+		t.cursorIndexX = column
+		t.showCursorColumn()
+		t.rowsStale = true
+	}
+	if rows := len(t.filteredRows); rows > 0 {
+		t.moveCursorTo(max(min(row, rows-1), 0))
+	}
+	return t
+}
+
+// ColumnAt returns the column that shows at column x of the rendered table, counted
+// from 0 at its left edge. It is false outside the table. With the Y of a mouse click
+// on line 0 it tells which header was clicked.
+func (t *Table) ColumnAt(x int) (column int, ok bool) {
+	t.settle()
+	t.updateHeader()
+	cell := t.headerBox.CellAt(x, 0)
+	if cell == nil {
+		return 0, false
+	}
+	header := t.headerBox.GetRow(0)
+	for i := 0; i < header.CellsLen(); i++ {
+		if header.GetCell(i) == cell {
+			return t.columnVisibleLeftIndex + i, true
+		}
+	}
+	return 0, false
+}
+
+// RowAt returns the row that shows at line y of the rendered table, counted from 0 at
+// the header, as an index over the rows the filter keeps. It is false for the header,
+// the footer and the blank lines under the last row.
+func (t *Table) RowAt(y int) (row int, ok bool) {
+	t.settle()
+	if y < 1 || y > t.rowsBoxHeight {
+		return 0, false
+	}
+	row = t.rowsTopIndex + y - 1
+	return row, row < len(t.filteredRows)
+}
+
 // GetCursorLocation returns the cursor's column and row, counted from 0. The row counts
 // over the rows the filter keeps, in sorted order.
 func (t *Table) GetCursorLocation() (int, int) {

@@ -608,7 +608,7 @@ func TestRenderMatchesAFreshTable(t *testing.T) {
 		}
 		randomOp := func() (string, op) {
 			n, column := 1+rng.Intn(15), rng.Intn(4)
-			switch rng.Intn(14) {
+			switch rng.Intn(15) {
 			case 0:
 				rows := randomRows()
 				return "add rows", func(tb *Table) { tb.MustAddRows(rows) }
@@ -631,6 +631,9 @@ func TestRenderMatchesAFreshTable(t *testing.T) {
 			case 8:
 				passing := rng.Intn(2) == 0
 				return "style passing", func(tb *Table) { tb.SetStylePassing(passing) }
+			case 12:
+				row := rng.Intn(40) - 5
+				return "set cursor", func(tb *Table) { tb.SetCursorLocation(column, row) }
 			case 9:
 				style := lipgloss.NewStyle().Align(lipgloss.Position(float64(rng.Intn(3)) / 2))
 				key := StyleKey(rng.Intn(6))
@@ -773,5 +776,93 @@ func TestNewTableCopiesItsHeaders(t *testing.T) {
 	tb.OrderByAsc(1)
 	if got := plain(tb.Render())[0]; got != "A   B ▲ " {
 		t.Fatalf("header %q, want %q", got, "A   B ▲ ")
+	}
+}
+
+// TestMouseFindsRowsAndColumns: ColumnAt and RowAt turn a position on the rendered
+// table into a column and a row, and SetCursorLocation moves the cursor there.
+func TestMouseFindsRowsAndColumns(t *testing.T) {
+	tb := NewTable(30, 6, []string{"A", "B", "C", "D", "E"}).SetMinWidth([]int{10, 10, 10, 10, 10})
+	for i := 0; i < 10; i++ {
+		n := strconv.Itoa(i)
+		tb.MustAddRows([][]any{{"a" + n, "b" + n, "c" + n, "d" + n, "e" + n}})
+	}
+
+	for _, tc := range []struct {
+		y    int
+		row  int
+		ok   bool
+		name string
+	}{
+		{-1, 0, false, "above the table"},
+		{0, 0, false, "the header"},
+		{1, 0, true, "the first line of rows"},
+		{4, 3, true, "the last line of rows"},
+		{5, 0, false, "the footer"},
+		{6, 0, false, "under the table"},
+	} {
+		if row, ok := tb.RowAt(tc.y); row != tc.row || ok != tc.ok {
+			t.Errorf("RowAt(%d), %s, = %d, %v, want %d, %v", tc.y, tc.name, row, ok, tc.row, tc.ok)
+		}
+	}
+	for _, tc := range []struct {
+		x      int
+		column int
+		ok     bool
+	}{{-1, 0, false}, {0, 0, true}, {9, 0, true}, {10, 1, true}, {29, 2, true}, {30, 0, false}} {
+		if column, ok := tb.ColumnAt(tc.x); column != tc.column || ok != tc.ok {
+			t.Errorf("ColumnAt(%d) = %d, %v, want %d, %v", tc.x, column, ok, tc.column, tc.ok)
+		}
+	}
+
+	// a click on line 3, column 25 selects the third row and the third column
+	row, _ := tb.RowAt(3)
+	column, _ := tb.ColumnAt(25)
+	tb.SetCursorLocation(column, row)
+	if x, y := tb.GetCursorLocation(); x != 2 || y != 2 || tb.GetCursorValue() != "c2" {
+		t.Fatalf("cursor at %d:%d on %q, want 2:2 on c2", x, y, tb.GetCursorValue())
+	}
+
+	// the table scrolls to a cursor set outside the visible rows and columns
+	tb.SetCursorLocation(4, 9)
+	if l, r := tb.GetVisibleColumnRange(); l != 2 || r != 4 {
+		t.Fatalf("visible range %d-%d with the cursor on the last column, want 2-4", l, r)
+	}
+	if got := plain(tb.Render())[1:5]; !slices.Equal(got, []string{
+		"c6        d6        e6        ",
+		"c7        d7        e7        ",
+		"c8        d8        e8        ",
+		"c9        d9        e9        ",
+	}) {
+		t.Fatalf("rows after the move:\n%s", strings.Join(got, "\n"))
+	}
+	if row, ok := tb.RowAt(1); row != 6 || !ok {
+		t.Fatalf("RowAt(1) = %d, %v after scrolling, want 6, true", row, ok)
+	}
+	if column, ok := tb.ColumnAt(0); column != 2 || !ok {
+		t.Fatalf("ColumnAt(0) = %d, %v after scrolling, want 2, true", column, ok)
+	}
+
+	// values out of range go to the nearest column and row
+	tb.SetCursorLocation(-3, 99)
+	if x, y := tb.GetCursorLocation(); x != 0 || y != 9 {
+		t.Fatalf("cursor at %d:%d, want 0:9", x, y)
+	}
+	tb.SetCursorLocation(99, -3)
+	if x, y := tb.GetCursorLocation(); x != 4 || y != 0 {
+		t.Fatalf("cursor at %d:%d, want 4:0", x, y)
+	}
+
+	// lines without a row, and a table without rows or columns
+	tb.SetFilter(0, "a1")
+	if _, ok := tb.RowAt(2); ok {
+		t.Fatal("RowAt found a row on a blank line")
+	}
+	empty := NewTable(10, 4, nil).SetCursorLocation(2, 2)
+	if x, y := empty.GetCursorLocation(); x != 0 || y != 0 {
+		t.Fatalf("cursor at %d:%d in a table without columns, want 0:0", x, y)
+	}
+	if _, ok := empty.ColumnAt(0); ok {
+		t.Fatal("ColumnAt found a column in a table without columns")
 	}
 }
