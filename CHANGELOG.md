@@ -2,28 +2,91 @@
 
 All notable changes to this project will be documented in this file.
 ## Unreleased
+### ⚠ BREAKING CHANGES
+- The demos are a Go module of their own, `github.com/x85446/stickers/example`. The library module requires Lip Gloss and nothing from Bubble Tea or gocsv.
+- `Cell.GetStyle` returns the style set on the cell. A render no longer merges the keys a row or column passes down into it.
+- A row without lines takes no line of its box. It used to take one blank line, which pushed the rows under it out of a short box.
+- Table cells cut a value that is too wide and end it in `…`. They used to wrap it at a word and show the first line.
+- A table keeps its sort: rows added after `OrderByAsc` or `OrderByDesc` are sorted in, and `ClearRows` keeps the sort, the filter and the cursor's row.
+- The cursor of a table sits on the last row only while a filter hides its own row, and is back on its row when the filter goes. It used to stay on the row the filter moved it to.
+- `Table.SetTypes` returns an `ErrorRowLen` for a wrong number of types. The messages of the table's errors start with `table:`.
+- A minimum width or height holds next to fixed sizes that leave nothing. It used to drop to 0 there.
+- `SetRows` and `SetColumns` copy the slice they are given.
+- Lip Gloss v1.1.0 is the minimum version, up from v0.13.0.
 ### Fixes
-- A cell keeps the trailing spaces of its last content line, so a centered or right-aligned block of lines keeps every line at the same offset. `ansi.Wrap`, in the cell and again inside lipgloss, drops spaces at the end of its input.
-- A cell's border and margins always render complete when the cell has room for them. Content taller than the cell is clipped to the content area instead of pushing the bottom border out of the cell; a cell with zero lines renders as a blank line of its width in a row and takes no room in a column.
+#### flexbox
+- Every setter takes effect on the next render. `SetWidth` or `SetHeight` alone on a box with a border, `LockRowHeight`, `LockColumnWidth`, `SetStyle` on a box, row or column, and setters on a cell kept from before the first render used to wait for another call to trigger a new layout.
+- A style passed down with `StylePassing` or `UseStyle` reaches the children again after it changes, and stops when passing is turned off. Children used to keep the first style they inherited.
+- A box or column with padding is its full width. The padding was subtracted twice, so the box rendered narrower and its content wrapped.
+- A box with a row or column that has no cells, or whose cells all have a ratio of 0, renders. It used to panic.
+- Columns that together are wider than a `HorizontalFlexBox` are cut at its edge. They used to wrap onto extra lines.
+- Cell content sits where the style's vertical alignment puts it. Since the trailing-space fix below, centered content sat at the top and bottom-aligned content one line too high.
+- A cell keeps the trailing spaces of its last content line, so a centered or right-aligned block of lines keeps every line at the same offset. The same holds for the last line of a styled column or box.
+- A cell's border and margins always render complete when the cell has room for them. Content taller than the cell is clipped to the content area instead of pushing the bottom border out of the cell. A styled row, column or box keeps its bottom border the same way.
 - A row clips cells that stick out past its edge, such as a fixed-width cell wider than the box, instead of word-wrapping them onto extra lines. A cell with zero width adds no columns to its row.
+- A cell is always its full width. A wide character that does not fit before the cell's edge used to leave the line one column short and shift the cells to its right.
+- Shares are computed with integers. Floating point rounding gave some cells one unit too few, such as each of 49 equal cells in 49 columns.
+- A content generator never receives a negative size, and a cell never gets one.
+- A cell breaks its content where Lip Gloss v1 breaks it. A leading space before a long word, wide characters that end at the cell's edge, and combining marks used to lose characters or blank the cell.
+- Escape sequences in the content of a cell without a style are closed at every line end. A color used to run into the next cell.
+- Content with Windows line ends leaves no carriage return in a cell.
+- A bordered row too short for its cells closes its frame over its full width instead of two columns.
+- A nil row, column or cell, such as a getter returns for an index that is not there, is left out instead of causing a panic at the next render.
+- `Render` returns exactly the box's height in lines and width in columns for every size and style.
+#### table
+- `SetFilter`, `OrderByAsc` and `OrderByDesc` ignore a negative index. They used to panic.
+- `SetTypes` returns an `ErrorBadType` for a nil type. It used to panic.
+- `GetCursorValue` and `GetCursorLocation` reflect `SetFilter`, `ClearRows` and `AddRows` at once. They used to answer from the rows of the last render, and `GetCursorValue` panicked after a reload with fewer rows.
+- A table renders exactly its height: one line is the header, two the header and footer. It used to render three lines at any height under three, and a footer wider than the table wrapped onto a second line.
+- Floats show all their digits, `9.5` for 9.5. They used to show one significant digit, `1E+01`.
+- A sort applies whatever the filter shows. It used to be ignored while fewer than two rows were visible.
 - `OrderByAsc` sorts smallest first and `OrderByDesc` largest first; the two were swapped.
+- Header titles are cut by the columns they take on screen. Titles with multi-byte or wide characters used to be cut inside a character.
+- The footer names the filter only while one is set, not for an empty filter string.
+- `SetMinWidth` recomputes the visible columns, and the cursor's column is visible even when it alone is wider than the table.
+- A table without columns renders. It used to panic.
+- `SetWidth` with the width the table already has changes nothing. It used to choose the visible columns again from the cursor's column, which scrolled a table that is sized on every render.
+- The table is its size whatever frame the footer's style has; a border or padding on it used to add lines.
+- A value is cut to the room its cell has: the padding of the cursor cell's style, tabs and Windows line ends are counted, so a cut value always ends in `…`.
 - `int64` columns are accepted by `SetTypes` and `AddRows`, as `Ordered` always listed them.
 - `SetStyles` overrides apply to that table only; the package defaults and other tables keep their styles.
 - A table rendered before `SetHeight` is the height given to `NewTable`, not one line taller.
 - After horizontal scrolling, rows size their cells with the ratios and minimum widths of the columns on screen, as the header does.
-### Changes
-- `SetRatio` and `SetMinWidth` panic on a wrong number of values or a ratio under 1 instead of calling `log.Fatalf`.
+### Performance
+- `Render` reuses what did not change. A cell renders again only when its size, style or content changed, a row or column only when one of its cells did. On a 160×48 grid of 17 cells an unchanged render takes 0.4 µs instead of 1.8 ms and allocates nothing; a render after one cell's content changed takes 30 µs.
+- Rows, columns and boxes without a style are assembled directly instead of through a Lip Gloss style and join, which makes a full render after a resize about six times faster.
+- A table keeps the rows on screen between renders. A cursor move takes about 25 µs instead of 1 ms, also while scrolling and under a filter, and an unchanged table 7 µs.
+- Sorting is a stable O(n log n) sort in place instead of a bubble sort: 0.8 ms instead of 102 ms for 10,000 rows.
+- The filter runs when the filter or the rows change, not on every cursor move, and compares ASCII text without allocating.
 ### Features
+- The cell setters apply in both boxes. In a `FlexBox`, `SetMinHeight` on a cell sets the minimum height of its row. In a `HorizontalFlexBox`, `SetFixedHeight` on a cell pins its height, and `SetFixedWidth` and `SetMinWidth` set the width of its column.
+- `Column.SetFixedWidth` pins a column, as `Row.SetFixedHeight` pins a row.
+- `Table.GetCursorRow` returns the values of the row under the cursor.
+- `Cell.GetID`, and `GetWidth` and `GetHeight` on `Row` and `Column`.
+- `UpdateCellWithIndex` returns its row or column, so it chains like the other setters. `UpdateRow` and `UpdateColumn` ignore an index out of range instead of panicking.
 - `HorizontalFlexBox.SetColumnAlign` places columns that together are narrower than the box at left, center or right.
+### Changes
+- `SetRatio` and `SetMinWidth` panic on a wrong number of values or a ratio under 1 instead of calling `log.Fatalf`, and copy the slices they are given.
 ### Examples
+- `make run` runs every demo in one program. The Makefile follows the two-layer convention with `build`, `test`, `lint`, `bench`, `cover` and `check` targets.
+- The table demos compile `example/sample/sample.csv` in, so every demo runs from any directory.
+- demo-3 embeds its table through a content generator.
+- The directory of demo-2 is `demo-2-flex-box-horizontal`.
 - The size-logging copy of demo-10 and the `demo-10-log`, `log` and `log-follow` make targets are removed.
 - `make demo-all` opens on a splash screen, shows one header format for every demo (name, the demo's own keys, then `a`, `tab`, `shift+tab`, `q`), and every demo fits under the header at any terminal size.
 - demo-7 cells show only their label when one line fits and nothing when none does; the border cycle runs Fill, Hidden, Normal, Rounded, Thick, Double.
 - demo-10's header row keeps its text in dynamic mode; demo-11 no longer crashes on its first resize; demo-12's about text explains row alignment and the cut on narrow terminals.
 - All demo sources are tracked; the `.gitignore` patterns for demo binaries are anchored to the repository root.
 ### Documentation
-- README is a developer guide to both packages: sizing rules, what a cell shows when it does not fit, styles, reading the grid back, the table API, demos and tests.
-- Package documentation for `flexbox` and `table`, and every exported identifier has a doc comment.
+- README is a developer guide to both packages: sizing rules, what renders when space runs out, styles, recipes for nesting boxes and components, the table API, performance, demos and development.
+- Package documentation for `flexbox` and `table`, a doc comment on every exported identifier, and runnable examples.
+### Tooling
+- Tests for the sizing rules and every rendering rule, and two randomized checks: the boxes against a reference built from plain Lip Gloss joins, and a table that renders after every change against one built from scratch.
+- Benchmarks for rendering, sorting and filtering.
+- A golangci-lint configuration and a GitHub Actions workflow that tests and lints both modules.
+### Dependencies
+- Updated `github.com/charmbracelet/lipgloss` to `v1.1.0` and `github.com/charmbracelet/x/ansi` to `v0.8.0`.
+- The demos use `github.com/charmbracelet/bubbletea` `v1.3.10`.
 ## [v1.5.0](https://github.com/76creates/stickers/compare/v1.4.1...v1.5.0) (2025-09-29)
 ### ⚠ BREAKING CHANGES
 - `TableStyleKey` is now `StyleKey`, and names of the keys better reflect their purpose within their package

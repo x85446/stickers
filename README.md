@@ -10,10 +10,29 @@ Stickers is a set of layout elements for terminal apps built with
 - `table`: a scrollable, sortable, filterable table that uses `flexbox` for its
   layout.
 
+Both render only what changed since the last frame, so calling `Render` from
+every `View` is cheap. See [Performance](#performance).
+
 This module lives at `github.com/x85446/stickers`. It is a fork of
 [76creates/stickers](https://github.com/76creates/stickers).
 
 ![FlexBox with Table](.github/images/flex-box-with-table.gif)
+
+## Contents
+
+- [Install](#install)
+- [FlexBox](#flexbox)
+  - [Sizing rules](#sizing-rules)
+  - [What renders when space runs out](#what-renders-when-space-runs-out)
+  - [Content](#content)
+  - [Styles](#styles)
+  - [Reading and changing the grid](#reading-and-changing-the-grid)
+  - [HorizontalFlexBox](#horizontalflexbox)
+  - [Recipes](#recipes)
+- [Table](#table)
+- [Performance](#performance)
+- [Demos](#demos)
+- [Development](#development)
 
 ## Install
 
@@ -21,8 +40,13 @@ This module lives at `github.com/x85446/stickers`. It is a fork of
 go get github.com/x85446/stickers@latest
 ```
 
-Requires Go 1.23 or later. Stickers depends on `lipgloss` v0.13 and
-`bubbletea` v1.1.
+The library requires Go 1.23 or later and depends on Lip Gloss v1
+(`github.com/charmbracelet/lipgloss`). It has no dependency on Bubble Tea: a
+box is a value that turns a size into a string, so it works with any Bubble Tea
+v1 release and outside Bubble Tea.
+
+The package documentation, with runnable examples, is on
+[pkg.go.dev](https://pkg.go.dev/github.com/x85446/stickers).
 
 ## FlexBox
 
@@ -37,23 +61,23 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/x85446/stickers/flexbox"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/flexbox"
 )
 
 type model struct{ box *flexbox.FlexBox }
 
 func newModel() model {
+	border := lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
 	box := flexbox.New(0, 0)
 	box.AddRows([]*flexbox.Row{
 		box.NewRow().AddCells(
-			flexbox.NewCell(1, 1).SetContent("sidebar").SetFixedWidth(20),
-			flexbox.NewCell(3, 1).SetContent("main"),
+			flexbox.NewCell(1, 1).SetStyle(border).SetContent("sidebar").SetFixedWidth(20),
+			flexbox.NewCell(3, 1).SetStyle(border).SetContent("main"),
 		),
 		box.NewRow().AddCells(
-			flexbox.NewCell(1, 1).SetContent("footer").
-				SetStyle(lipgloss.NewStyle().Border(lipgloss.NormalBorder())),
+			flexbox.NewCell(1, 1).SetStyle(border).SetContent("footer"),
 		).SetFixedHeight(3),
 	})
 	return model{box: box}
@@ -64,8 +88,7 @@ func (m model) Init() tea.Cmd { return nil }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.box.SetWidth(msg.Width)
-		m.box.SetHeight(msg.Height)
+		m.box.SetWidth(msg.Width).SetHeight(msg.Height)
 	case tea.KeyMsg:
 		if msg.String() == "q" || msg.String() == "ctrl+c" {
 			return m, tea.Quit
@@ -84,63 +107,81 @@ func main() {
 }
 ```
 
+Every setter returns its receiver, so calls chain. A setter takes effect on the
+next `Render`; nothing else has to be called.
+
 ### Sizing rules
 
 Every cell is created with `NewCell(ratioX, ratioY)`.
 
-**Row heights.** A row with a fixed height takes exactly that many lines. The
-remaining lines are split between the other rows in proportion to each row's
-largest `ratioY`. Leftover lines go one each to the rows with the largest
-ratios.
+Rows share the height of a box, and the cells of a row share its width, by the
+same four steps:
+
+1. Fixed sizes are taken first.
+2. What is left is split in proportion to the ratios. Each share is rounded
+   down and the leftover goes one unit each to the largest ratios.
+3. A share that falls under its minimum takes the minimum, and the others
+   split the rest.
+4. When the fixed sizes leave nothing, the ratio-sized entries get their
+   minimum, or nothing without one.
+
+**Row heights.**
 
 - `row.SetFixedHeight(n)` pins a row. `0` or less restores ratio sizing.
 - `cell.SetFixedHeight(n)` asks for a fixed row height from a cell. The row
   takes the largest request among its cells.
+- `cell.SetMinHeight(n)` keeps the cell's row at least `n` lines tall. The row
+  takes the largest minimum among its cells.
+- A row's ratio is the largest `ratioY` among its cells.
 - `box.LockRowHeight(n)` pins every row to `n` lines. `0` or less restores
   ratio sizing.
 
-**Cell widths within a row.** Cells with a fixed width take exactly that many
-columns. The remaining columns are split between the other cells in proportion
-to `ratioX`, honoring `SetMinWidth`. If the fixed widths alone exceed the row,
-the other cells get no columns.
+**Cell widths within a row.**
 
 - `cell.SetFixedWidth(n)` pins a cell. `0` or less restores ratio sizing.
 - `cell.SetMinWidth(n)` keeps a ratio-sized cell at least `n` columns wide.
+- The other cells split the rest by `ratioX`.
 
 **Cell heights within a row.** Each cell gets `ratioY / maxRatioY` of the row
 height, rounded down, and sits at the top of the row. Cells with the largest
-ratio fill the row; the others are shorter. A cell short of its content shows
-what fits, see below.
+ratio fill the row; the others are shorter.
 
 **Rows of different widths.** A row whose cells add up to less than the box
 width, because of fixed widths, keeps that width. `box.SetRowAlign(pos)` with
-`lipgloss.Left`, `lipgloss.Center` or `lipgloss.Right` places such rows inside
-the box. The default is left.
+`lipgloss.Left`, `lipgloss.Center` or `lipgloss.Right` places such rows against
+the widest row. The default is left.
 
-### What a cell shows when it does not fit
+### What renders when space runs out
 
-A cell renders its frame first and its content second.
+`Render` always returns exactly `GetHeight()` lines of `GetWidth()` columns,
+whatever the rows and cells ask for.
 
-- The border and margins render complete whenever the cell has room for them.
-  Content taller than the cell loses its bottom lines; the bottom border stays.
+- A cell renders its frame first and its content second. The border and
+  margins render complete whenever the cell has room for them. Content taller
+  than the cell loses its bottom lines; the bottom border stays.
 - Content is wrapped at the content width and clipped to the lines between the
   paddings.
 - A cell too short for its frame shows its top lines. A bordered cell with two
   lines is a closed, empty frame; with one line it is the top border.
-- A cell with zero lines renders as a blank line of its width, so a row keeps
-  its columns. A cell with zero columns adds nothing to a row.
+- A row without lines takes no line of the box, so the rows that have lines
+  keep theirs. A cell without lines leaves its columns blank, and a cell
+  without columns adds nothing to its row.
 - A row never wraps its cells. Anything wider than the row, such as a
   fixed-width cell wider than the box, is cut at the row's edge.
+- Rows that together are taller than the box are cut at its bottom edge.
 
 ### Content
 
 - `cell.SetContent(s)` sets static text.
 - `cell.SetContentGenerator(func(w, h int) string)` builds the text each time
-  the cell renders. `w` and `h` are the area inside the border and margins,
-  so the generator can lay out text for the space it actually has. Padding, if
-  the style has any, is inside that area.
+  the box renders. `w` and `h` are the area inside the border and margins,
+  never less than 0, so the generator can lay out text for the space it has.
+  Padding, if the style has any, is inside that area. A cell without columns
+  or lines does not call its generator.
 - `cell.GetWidth()` and `cell.GetHeight()` return the full allocated size,
   including the frame.
+- Content keeps its alignment: the style's horizontal and vertical alignment
+  place it, and trailing spaces count as part of a line.
 
 ### Styles
 
@@ -153,41 +194,128 @@ style is set; the grid owns sizes.
   column it passes the style to its cells. A row with passing enabled inherits
   the box style first, then hands the result to its cells. Children inherit
   only keys they have not set themselves; margins and padding never pass.
+  Changing a passed style changes the children on the next render.
 - `UseStyle(style)` sets the style and enables passing in one call.
 - `NewCell(x, y, flexbox.WithStyle(style))` sets a cell style at creation.
+- `GetStyle()` returns the style set on the cell itself, without what a row or
+  column passes down.
 
-### Reading the grid back
+### Reading and changing the grid
 
-`GetRow`, `GetCell` and `GetCellWithID` return pointers and mark the box or row
-for recalculation on the next render, so use them when you intend to change
-something. `GetRowCopy`, `GetRowCellCopy` and `GetCellCopy` return copies and
-leave the layout alone, so use them to read sizes or content. `UpdateRow` and
-`UpdateCellWithIndex` replace an element in place. Cell IDs default to the
-cell's index in its row; `SetID` names one for `GetCellWithID`.
+- `GetRow`, `GetCell` and `GetCellWithID` return the elements themselves.
+  Change them and the next render shows it.
+- `GetRowCopy`, `GetRowCellCopy` and `GetCellCopy` return copies. Changes to a
+  copy do not reach the grid.
+- `UpdateRow` and `UpdateCellWithIndex` replace an element in place.
+- All of them return `nil`, or change nothing, for an index that is not there.
+  A `nil` row, column or cell is left out wherever one is added or set.
+- Add each row, column and cell in one place. One that sits in two places has
+  one size, the size of its last place.
+- Cell IDs default to the cell's index in its row; `SetID` names one for
+  `GetCellWithID`, and `GetID` reads it back.
+- Sizes are computed when the box renders. `box.ForceRecalculate()` computes
+  them without rendering, so `GetWidth` and `GetHeight` on rows and cells can
+  be read first.
 
 ### HorizontalFlexBox
 
 `NewHorizontal(width, height)` lines up columns side by side; cells stack
-vertically inside each column.
+vertically inside each column. It mirrors `FlexBox` with the two directions
+swapped: columns share the box width, and the cells of a column share its
+height.
 
-- Column widths follow each column's largest cell `ratioX`.
-  `LockColumnWidth(n)` pins every column to `n` columns.
-- Inside a column, cell heights are split by `ratioY`, honoring
-  `SetMinHeight`. Each cell's width is `ratioX / maxRatioX` of the column.
-- `SetFixedWidth`, `SetFixedHeight` and `SetMinWidth` apply to cells of a
-  `FlexBox` only. `SetMinHeight` applies to cells of a `HorizontalFlexBox`
-  only.
+```go
+box := flexbox.NewHorizontal(width, height)
+box.AddColumns([]*flexbox.Column{
+	box.NewColumn().SetFixedWidth(24).AddCells(
+		flexbox.NewCell(1, 1).SetContent("menu"),
+	),
+	box.NewColumn().AddCells(
+		flexbox.NewCell(1, 1).SetContent("title").SetFixedHeight(3),
+		flexbox.NewCell(1, 1).SetContent("body"),
+	),
+})
+```
+
+The same cell setters apply in both boxes. Along the direction the cells are
+laid out they size the cell; across it they size the cell's row or column,
+which takes the largest value among its cells.
+
+| Cell setting | In a `FlexBox` row | In a `HorizontalFlexBox` column |
+|---|---|---|
+| `ratioX` | share of the row's width | width as a fraction of the column; the largest sets the column's share of the box |
+| `ratioY` | height as a fraction of the row; the largest sets the row's share of the box | share of the column's height |
+| `SetFixedWidth` | width of the cell | width of the column |
+| `SetMinWidth` | minimum width of the cell | minimum width of the column |
+| `SetFixedHeight` | height of the row | height of the cell |
+| `SetMinHeight` | minimum height of the row | minimum height of the cell |
+
+- `column.SetFixedWidth(n)` pins a column, as `row.SetFixedHeight(n)` pins a
+  row. `LockColumnWidth(n)` pins every column to `n` columns.
 - `SetColumnAlign(pos)` places the columns inside the box when together they
-  are narrower than it, such as columns of a locked width, at `lipgloss.Left`,
-  `lipgloss.Center` or `lipgloss.Right`. The default is left.
+  are narrower than it, at `lipgloss.Left`, `lipgloss.Center` or
+  `lipgloss.Right`. The default is left. Columns that together are wider than
+  the box are cut at its edge.
 - `GetColumn`, `GetColumnCopy`, `GetColumnCellCopy`, `UpdateColumn` and
   `ColumnsLen` mirror the `FlexBox` row methods.
+
+### Recipes
+
+**Nest a box in a cell.** A content generator receives the cell's content
+area. Size the inner box to it and render:
+
+```go
+inner := flexbox.NewHorizontal(0, 0)
+// add columns to inner
+
+cell := flexbox.NewCell(1, 1).SetContentGenerator(func(w, h int) string {
+	return inner.SetWidth(w).SetHeight(h).Render()
+})
+```
+
+**Put a component in a cell.** The same pattern fits anything that renders to a
+size: a `table.Table`, or a Bubble Tea component such as a viewport.
+
+```go
+flexbox.NewCell(3, 1).SetContentGenerator(func(w, h int) string {
+	return m.table.SetWidth(w).SetHeight(h).Render()
+})
+
+flexbox.NewCell(3, 1).SetContentGenerator(func(w, h int) string {
+	m.viewport.Width, m.viewport.Height = w, h
+	return m.viewport.View()
+})
+```
+
+**Show live data.** A content generator runs on every render, so content that
+reads from the model is always current:
+
+```go
+flexbox.NewCell(1, 1).SetContentGenerator(func(_, _ int) string {
+	return fmt.Sprintf("%d requests", m.requests)
+})
+```
+
+**A sidebar, a main area and a status line.**
+
+```go
+box := flexbox.New(width, height)
+box.AddRows([]*flexbox.Row{
+	box.NewRow().AddCells(
+		flexbox.NewCell(1, 1).SetContent("sidebar").SetFixedWidth(24),
+		flexbox.NewCell(1, 1).SetContent("main").SetMinWidth(40),
+	),
+	box.NewRow().SetFixedHeight(1).AddCells(
+		flexbox.NewCell(1, 1).SetContent("status"),
+	),
+})
+```
 
 ## Table
 
 A `Table` renders a one-line header, one-line rows, and a one-line footer with
-the cursor position and table size. It scrolls vertically with the cursor and
-horizontally when the columns' minimum widths do not fit.
+the cursor position and the size of the rows area. It scrolls vertically with
+the cursor and horizontally when the columns' minimum widths do not fit.
 
 ```go
 t := table.NewTable(0, 0, []string{"ID", "Name", "Score"})
@@ -206,9 +334,10 @@ t.SetWidth(w)
 t.SetHeight(h) // includes the header and footer lines
 
 // on keys
-t.CursorDown()    // also CursorUp, CursorLeft, CursorRight
-t.OrderByAsc(2)   // or OrderByDesc; GetOrder() reports the current sort
+t.CursorDown()       // also CursorUp, CursorLeft, CursorRight
+t.OrderByAsc(2)      // or OrderByDesc; GetOrder() reports the current sort
 t.SetFilter(1, "li") // case-insensitive substring on column 1; UnsetFilter() clears
+row := t.GetCursorRow() // the values of the row under the cursor
 
 // in View
 s := t.Render()
@@ -218,51 +347,113 @@ s := t.Render()
   value per column. Accepted types are `string`, `int`, `int8`, `int16`,
   `int32`, `int64`, `float32` and `float64`. `SetTypes` clears existing rows.
 - **Rows.** `AddRows` validates each row's length and cell types and returns
-  the first error without adding anything. `MustAddRows` panics instead.
-  `ClearRows` empties the table.
+  the first error without adding anything: an `ErrorRowLen`, `ErrorBadType` or
+  `ErrorBadCellType`. `MustAddRows` panics instead. `ClearRows` empties the
+  table and keeps the sort, the filter and the cursor's row, so a reload shows
+  the new data the same way.
+- **Values.** Numbers show as plain decimals. A value wider than its column is
+  cut and ends in `…`; a value of several lines shows its first, and a tab
+  shows as four spaces.
 - **Sorting.** `OrderByAsc(i)` and `OrderByDesc(i)` sort by column `i` using
-  the column's type, so numbers sort numerically. An unknown index is ignored.
+  the column's type, so numbers sort numerically. Rows that compare equal keep
+  their order, so sorting by one column and then by another orders by both.
+  Rows added to a sorted table are sorted in. An unknown index is ignored.
   The header marks the sorted column with ▲ or ▼.
 - **Filtering.** `SetFilter(i, s)` keeps rows whose column `i` contains `s`,
   ignoring case. The header marks the filtered column with ⑂ and the footer
   names the filter while the cursor is on that column. `GetFilter` returns the
   column, `-1` when none, and the string.
-- **Cursor.** `GetCursorLocation` returns `x, y`; `GetCursorValue` returns the
-  text under the cursor, or `""` when the table is empty.
+- **Cursor.** `GetCursorLocation` returns `x, y`, `GetCursorValue` the text
+  under the cursor and `GetCursorRow` a copy of the row's values. All three
+  count over the rows the filter keeps, in sorted order; without rows the
+  value is `""` and the row `nil`. While a filter hides the cursor's row the
+  cursor sits on the last row, and it is back on its row when the row is.
 - **Horizontal scrolling.** Columns are shown while their minimum widths fit
   the table width; moving the cursor past the visible range scrolls.
   `GetVisibleColumnRange` returns the first and last visible column. With all
-  minimum widths at `0`, every column is always visible.
+  minimum widths at `0`, every column is always visible. The cursor's column
+  is always visible.
 - **Styles.** `SetStyles(map[table.StyleKey]lipgloss.Style)` overrides any of
   `StyleKeyHeader`, `StyleKeyFooter`, `StyleKeyRows`, `StyleKeyRowsSubsequent`
   (every other row), `StyleKeyRowsCursor` and `StyleKeyCellCursor`; keys you
   leave out keep their defaults. `SetStylePassing(true)` passes the row styles
   down to the cells.
+- **Size.** `Render` returns exactly the table's height in lines, each the
+  table's width in columns, whatever frames the styles have: the header, every
+  row and the footer are one line each. A table of one line is the header
+  alone; of two, the header and the footer. A footer without room drops the
+  filter first and the size second.
+- **In a cell.** `SetWidth` and `SetHeight` with the size the table already
+  has do nothing, so a content generator can size the table on every render.
 - **Sizing checks.** `SetRatio` and `SetMinWidth` must receive exactly one
   value per column, and ratios must be greater than zero. A mismatch panics,
   since it is a programming error.
 
 ![Table Multi-Type](.github/images/table-multi-type.gif)
 
+## Performance
+
+Bubble Tea calls `View` after every message, so `Render` runs far more often
+than the layout changes. Both packages are built for that:
+
+- A box computes its layout on every render with integer math and no
+  allocation.
+- A cell renders again only when its size, its style or its content changed. A
+  row renders again only when one of its cells did, and the box only when one
+  of its rows did.
+- Rows, columns and boxes without a style of their own are assembled directly,
+  without a Lip Gloss pass.
+- A table keeps the rows on screen between renders. A cursor move renders the
+  two rows it touches, and a scroll renders the row that scrolls in.
+- Sorting is a stable O(n log n) sort in place. The filter runs when the
+  filter or the rows change, never on a cursor move.
+
+Content generators run on every render, so keep them cheap or cache what they
+compute.
+
+Text styled by an earlier render is reused as it is. Set the Lip Gloss color
+profile before the first render; after changing it at run time, set the styles
+again with `SetStyle` or `SetStyles`.
+
+Measured on an Apple M2 Pro with `make bench`, for a 160×48 grid of 17 cells
+and a 160×48 table:
+
+| Benchmark | Time per render |
+|---|---|
+| Grid, nothing changed | 0.4 µs, no allocation |
+| Grid, one cell's content changed | 30 µs |
+| Grid, resized, every cell rendered | 260 µs |
+| Table of 1,000 rows, nothing changed | 7 µs, no allocation |
+| The same table in a flexbox cell, nothing changed | 8 µs, no allocation |
+| Table, cursor moved one row | 23 µs |
+| Table of 100,000 rows, scrolled one row | 27 µs |
+| Table of 100,000 rows, cursor moved under a filter | 25 µs |
+| Sort 10,000 rows | 0.8 ms |
+| Filter 100,000 rows and render | 2.3 ms |
+
+A box and a table are not safe for concurrent use. Bubble Tea runs `Update`
+and `View` on one goroutine, so a model needs no locking.
+
 ## Demos
 
 The `example` directory holds twelve demos and a combined program that cycles
-through them.
+through them. It is a Go module of its own, so the demos' dependencies stay
+out of the library's `go.mod`.
 
 ```bash
-make help       # lists every demo with a one-line description
-make demo-all   # all demos: tab / shift+tab cycle, a about, q quit
+make help       # lists every target, with one line for each demo
+make run        # all demos: tab / shift+tab cycle, a about, q quit
 make demo-7     # one demo
 ```
 
-Every demo answers `a` for an about box and `q` to quit. In `demo-all` the
+Every demo answers `a` for an about box and `q` to quit. In `make run` the
 purple header names the demo, lists its own keys, then the shared keys.
 
 | Demo | Shows | Keys |
 |---|---|---|
 | 1 FlexBox Simple | ratio-based rows and cells | |
 | 2 FlexBox Horizontal | `HorizontalFlexBox` columns | |
-| 3 FlexBox with Table | a `Table` inside a cell, CSV data | arrows, ctrl+s sort, enter copies the cell into the grid, letters filter |
+| 3 FlexBox with Table | a `Table` inside a cell through a content generator | arrows, ctrl+s sort, enter copies the cell into the grid, letters filter |
 | 4 Table Simple String | string columns, sorting, filtering | arrows, ctrl+s, enter, letters |
 | 5 Table Multi-Type | typed columns via gocsv, numeric sorting | arrows, ctrl+s, enter, letters |
 | 6 Nested Borders | recursive boxes through a content generator | b border |
@@ -273,23 +464,42 @@ purple header names the demo, lists its own keys, then the shared keys.
 | 11 Cell Config | changing a cell's fixed sizes at run time | b border, h text, C-W select a cell, then w, h, digits, enter, esc |
 | 12 Row Alignment | `SetRowAlign` with rows narrower than the box | r row align |
 
-Demos 3, 4 and 5 read `example/sample.csv` relative to the working directory,
-so run them through `make` or from inside `example`.
+The table demos show `example/sample/sample.csv`, which is compiled into them.
 
 ![FlexBox Simple](.github/images/flex-box-simple.gif)
 
-## Tests
+## Development
 
 ```bash
-go test ./...
+make prereqs   # check for Go, install golangci-lint when it is missing
+make test      # the library's tests, then the demos' tests
+make lint      # golangci-lint on both modules
+make bench     # the render, sort and filter benchmarks
+make cover     # coverage of the library, function by function
+make check     # lint and test
 ```
 
-The `flexbox` tests cover the cell and row rendering rules above and column
-alignment. The `table` tests cover typed sorting in both directions, style
-overrides, the height before `SetHeight`, cell sizes after horizontal
-scrolling, and the sizing checks. `example/demo-all` has a test that cycles
-every demo at several terminal sizes and checks that each fits under the
-header.
+The repository holds two Go modules. The root module is the library: packages
+`flexbox` and `table`, which depend on Lip Gloss alone. The `example` module
+holds the demos and adds Bubble Tea and gocsv.
+
+The tests cover:
+
+- **`flexbox`.** The sizing rules, the block operations behind rendering, and
+  every rule under [What renders when space runs out](#what-renders-when-space-runs-out).
+  A reference renderer composes random grids with plain Lip Gloss joins and
+  styles; the boxes must return the same text after every random change, which
+  covers both the direct assembly of unstyled elements and the reuse of what
+  did not change.
+- **`table`.** Typed sorting, filtering, the cursor and the viewport, the
+  header and footer at every size, value formatting, bad input and style
+  overrides. A table that renders after every random change must show what a
+  table built from scratch with the same changes shows.
+- **`example`.** A test cycles every demo at several terminal sizes and checks
+  that each fits under the header.
+
+Continuous integration runs the tests and the linter on every push and pull
+request.
 
 ## License
 
