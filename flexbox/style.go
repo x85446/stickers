@@ -95,6 +95,9 @@ type styling struct {
 	effective lipgloss.Style
 	id        uint64 // identity of effective; 0 while it is the empty style
 	frame     frame  // sizes of effective
+	// runeByRune is true when effective underlines or strikes through, which
+	// lipgloss writes one rune at a time
+	runeByRune bool
 
 	// what effective was resolved from
 	resolved     bool
@@ -119,8 +122,10 @@ func (s *styling) resolve(from inherited) {
 		s.effective = s.own.Inherit(*from.style)
 		s.id = nextID()
 	}
-	s.frame = frame{}
+	s.frame, s.runeByRune = frame{}, false
 	if s.id != 0 {
+		s.runeByRune = s.effective.GetUnderline() || s.effective.GetStrikethrough() ||
+			s.effective.GetUnderlineSpaces() || s.effective.GetStrikethroughSpaces()
 		s.frame = frame{
 			top:         s.effective.GetMarginTop() + s.effective.GetBorderTopSize(),
 			bottom:      s.effective.GetBorderBottomSize() + s.effective.GetMarginBottom(),
@@ -137,6 +142,19 @@ func (s *styling) resolve(from inherited) {
 		}
 	}
 	s.resolved, s.resolvedOwn, s.resolvedFrom = true, s.ownID, from.id
+}
+
+// around returns the style a row, column or box renders around content its children
+// rendered. Lipgloss writes underline and strikethrough one rune at a time, which cuts
+// the escape sequences of styled children apart, so content that carries any is left
+// without the two; children that inherit the style show them themselves.
+func (s *styling) around(content string) lipgloss.Style {
+	if !s.runeByRune || !strings.Contains(content, "\x1b") {
+		return s.effective
+	}
+	return s.effective.
+		UnsetUnderline().UnsetUnderlineSpaces().
+		UnsetStrikethrough().UnsetStrikethroughSpaces()
 }
 
 // passed returns what the element passes to its children: its effective style when

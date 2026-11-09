@@ -192,8 +192,8 @@ func (b *FlexBox) Render() string {
 		b.frame.extend(height)
 	} else {
 		b.frame.stack(b.parts, group, group, b.rowAlign, height)
-		f := b.style.frame
-		text := renderStyled(f.sized(b.style.effective, key.width, key.height), b.frame.String())
+		f, content := b.style.frame, b.frame.String()
+		text := renderStyled(f.sized(b.style.around(content), key.width, key.height), content)
 		b.frame.fill(text, key.width, key.height, f.top, f.bottom)
 	}
 	b.out = b.frame.String()

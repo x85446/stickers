@@ -190,8 +190,8 @@ func (b *HorizontalFlexBox) Render() string {
 	b.frame.join(b.parts, height, left, right)
 	b.frame.clip(width)
 	if !b.style.plain() {
-		f := b.style.frame
-		text := renderStyled(f.sized(b.style.effective, key.width, key.height), b.frame.String())
+		f, content := b.style.frame, b.frame.String()
+		text := renderStyled(f.sized(b.style.around(content), key.width, key.height), content)
 		b.frame.fill(text, key.width, key.height, f.top, f.bottom)
 	}
 	b.out = b.frame.String()

@@ -36,12 +36,65 @@ func resize(revs []uint64, n int) []uint64 {
 	return revs[:n]
 }
 
+// linkStart begins the escape sequence that opens or closes a hyperlink.
+const linkStart = "\x1b]8;"
+
+// isolateLinks makes every line open and close its own hyperlinks. A hyperlink stays
+// open until it is closed, also across line ends, so in a line of a block that sits
+// beside other blocks it would take in what follows on the same line of the screen.
+func isolateLinks(lines []string) {
+	open := ""
+	for i, line := range lines {
+		after := linkAfter(line, open)
+		if open != "" {
+			line = open + line
+		}
+		if after != "" {
+			line += ansi.ResetHyperlink()
+		}
+		lines[i], open = line, after
+	}
+}
+
+// linkAfter returns the sequence of the hyperlink that is open at the end of text, or ""
+// when none is, given the sequence open at its start.
+func linkAfter(text, open string) string {
+	for {
+		start := strings.Index(text, linkStart)
+		if start < 0 {
+			return open
+		}
+		text = text[start:]
+		// the sequence ends at a bell or at an escape and a backslash
+		end := strings.IndexAny(text[len(linkStart):], "\a\x1b")
+		if end < 0 {
+			return open
+		}
+		end += len(linkStart)
+		stop := end + 1
+		if text[end] == '\x1b' {
+			stop = min(end+2, len(text))
+		}
+		// it holds parameters, a semicolon and the address; no address closes the link
+		if _, address, _ := strings.Cut(text[len(linkStart):end], ";"); address == "" {
+			open = ""
+		} else {
+			open = text[:stop]
+		}
+		text = text[stop:]
+	}
+}
+
 // fill sets the block to text at exactly width by height. Lines over height are cut from
 // the inside, between the top frame lines (margin and border) and the bottom ones, so
 // both survive whenever height has room for them; below that the top lines stay. Lines
 // are cut or padded with spaces to width, and blank lines make up a missing height.
 func (b *block) fill(text string, width, height, top, bottom int) {
-	lines := trimInside(appendLines(b.lines[:0], text), height, top, bottom)
+	lines := appendLines(b.lines[:0], text)
+	if strings.Contains(text, linkStart) {
+		isolateLinks(lines)
+	}
+	lines = trimInside(lines, height, top, bottom)
 	for i, line := range lines {
 		lines[i] = fitLine(line, width)
 	}

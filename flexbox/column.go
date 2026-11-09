@@ -222,8 +222,8 @@ func (c *Column) render(from inherited) *block {
 	}
 	group := widest(c.parts)
 	c.out.stack(c.parts, group, group, lipgloss.Left, height)
-	f := c.style.frame
-	text := renderStyled(f.sized(c.style.effective, key.width, key.height), c.out.String())
+	f, content := c.style.frame, c.out.String()
+	text := renderStyled(f.sized(c.style.around(content), key.width, key.height), content)
 	c.out.fill(text, key.width, key.height, f.top, f.bottom)
 	return &c.out
 }
