@@ -163,7 +163,7 @@ func (b *FlexBox) GetWidth() int {
 // or content changed, a row when one of its cells did. An unchanged grid costs a call to
 // each content generator.
 func (b *FlexBox) Render() string {
-	b.layout()
+	b.arrange()
 
 	key := containerKey{width: max(b.width, 0), height: max(b.height, 0), style: b.style.id, align: b.rowAlign}
 	stale := !b.rendered || key != b.key || len(b.revs) != len(b.rows)
@@ -176,7 +176,6 @@ func (b *FlexBox) Render() string {
 		}
 		b.parts = append(b.parts, part)
 	}
-	b.place()
 	if !stale {
 		return b.out
 	}
@@ -192,8 +191,9 @@ func (b *FlexBox) Render() string {
 		b.frame.extend(height)
 	} else {
 		b.frame.stack(b.parts, group, group, b.rowAlign, height)
-		f, content := b.style.frame, b.frame.String()
-		text := renderStyled(f.sized(b.style.around(content), key.width, key.height), content)
+		f := b.style.frame
+		style, content := b.style.dress(b.frame.String())
+		text := renderStyled(f.sized(style, key.width, key.height), content)
 		b.frame.fill(text, key.width, key.height, f.top, f.bottom)
 	}
 	b.out = b.frame.String()
@@ -203,6 +203,12 @@ func (b *FlexBox) Render() string {
 // ForceRecalculate lays out the box and every row now, so the sizes and positions of
 // rows and cells can be read before the next render.
 func (b *FlexBox) ForceRecalculate() {
+	b.arrange()
+}
+
+// arrange sizes and places the rows and their cells. Render does it before anything
+// renders, so a content generator that reads a position reads the one of this render.
+func (b *FlexBox) arrange() {
 	b.layout()
 	passed := b.style.passed()
 	for _, row := range b.rows {
@@ -216,7 +222,7 @@ func (b *FlexBox) ForceRecalculate() {
 // a cell shorter than its row, or outside the box. It answers for the box as it is now,
 // which is what the last render showed unless something changed since.
 func (b *FlexBox) CellAt(x, y int) *Cell {
-	b.ForceRecalculate()
+	b.arrange()
 	point := image.Pt(x, y)
 	inside := b.contentBounds()
 	for _, row := range b.rows {

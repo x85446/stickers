@@ -8,6 +8,9 @@ type track struct {
 	fixed   int // exact size when greater than 0
 
 	size int // the result of distribute
+	// cross is the size across the shared length, which the owner of the tracks fills
+	// in: the height of a cell in a row, the width of a cell in a column
+	cross int
 
 	pinned bool // took its minimum
 	bumped bool // took a leftover unit

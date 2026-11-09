@@ -54,9 +54,9 @@ func TestBoundsInAFlexBox(t *testing.T) {
 	assertBounds(t, "tall cell", tall.GetBounds(), image.Rect(2, 5, 15, 9))
 	assertBounds(t, "short cell", short.GetBounds(), image.Rect(15, 5, 28, 7))
 
-	// content starts inside the border; padding belongs to the content area
+	// content starts inside the border and the padding
 	assertBounds(t, "side content", side.GetContentBounds(), image.Rect(3, 2, 9, 4))
-	assertBounds(t, "main content", main.GetContentBounds(), image.Rect(11, 2, 27, 4))
+	assertBounds(t, "main content", main.GetContentBounds(), image.Rect(12, 2, 26, 4))
 	assertBounds(t, "tall content", tall.GetContentBounds(), tall.GetBounds())
 
 	for _, tc := range []struct {

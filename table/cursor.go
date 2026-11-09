@@ -59,10 +59,36 @@ func (t *Table) SetCursorLocation(column, row int) *Table {
 	return t
 }
 
-// ColumnAt returns the column that shows at column x of the rendered table, counted
-// from 0 at its left edge. It is false outside the table. With the Y of a mouse click
-// on line 0 it tells which header was clicked.
+// CellAt returns the column and the row of the cell that shows at column x and line y of
+// the rendered table, both counted from 0 at its top left corner; the row is an index
+// over the rows the filter keeps. It is false on the header, the footer, a frame, a
+// blank line and outside the table. It turns the position of a mouse click into a cell.
+func (t *Table) CellAt(x, y int) (column, row int, ok bool) {
+	if row, ok = t.RowAt(y); !ok {
+		return 0, 0, false
+	}
+	t.updateRows()
+	line := t.rowsBox.GetRow(y - 1)
+	cell := t.rowsBox.CellAt(x, y-1)
+	if line == nil || cell == nil {
+		return 0, 0, false
+	}
+	for i := 0; i < line.CellsLen(); i++ {
+		if line.GetCell(i) == cell {
+			return t.columnVisibleLeftIndex + i, row, true
+		}
+	}
+	return 0, 0, false
+}
+
+// ColumnAt returns the column whose header shows at column x of the table's first line,
+// counted from 0 at its left edge. It is false where no header shows: outside the
+// table, on a frame of the header's style, and for a table without lines. With a mouse
+// click on line 0 it tells which header was clicked.
 func (t *Table) ColumnAt(x int) (column int, ok bool) {
+	if t.height <= 0 {
+		return 0, false
+	}
 	t.settle()
 	t.updateHeader()
 	cell := t.headerBox.CellAt(x, 0)

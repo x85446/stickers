@@ -42,47 +42,70 @@ const linkStart = "\x1b]8;"
 // isolateLinks makes every line open and close its own hyperlinks. A hyperlink stays
 // open until it is closed, also across line ends, so in a line of a block that sits
 // beside other blocks it would take in what follows on the same line of the screen.
+//
+// A link that opens inside another, such as a cell's inside its row's, ends both when it
+// closes; the outer one is opened again after it.
 func isolateLinks(lines []string) {
-	open := ""
+	var open []string // the sequences of the links open at this point, outermost first
 	for i, line := range lines {
-		after := linkAfter(line, open)
-		if open != "" {
-			line = open + line
+		if len(open) == 0 && !strings.Contains(line, linkStart) {
+			continue
 		}
-		if after != "" {
-			line += ansi.ResetHyperlink()
+		var b strings.Builder
+		if len(open) > 0 {
+			b.WriteString(open[len(open)-1])
 		}
-		lines[i], open = line, after
+		for {
+			start := strings.Index(line, linkStart)
+			if start < 0 {
+				break
+			}
+			sequence, address := linkSequence(line[start:])
+			if sequence == "" {
+				break
+			}
+			b.WriteString(line[:start+len(sequence)])
+			line = line[start+len(sequence):]
+			if address != "" {
+				open = append(open, sequence)
+				continue
+			}
+			// no address closes the link
+			if len(open) > 0 {
+				open = open[:len(open)-1]
+			}
+			if len(open) > 0 {
+				b.WriteString(open[len(open)-1])
+			}
+		}
+		b.WriteString(line)
+		if len(open) > 0 {
+			b.WriteString(ansi.ResetHyperlink())
+		}
+		lines[i] = b.String()
 	}
 }
 
-// linkAfter returns the sequence of the hyperlink that is open at the end of text, or ""
-// when none is, given the sequence open at its start.
-func linkAfter(text, open string) string {
-	for {
-		start := strings.Index(text, linkStart)
-		if start < 0 {
-			return open
-		}
-		text = text[start:]
-		// the sequence ends at a bell or at an escape and a backslash
-		end := strings.IndexAny(text[len(linkStart):], "\a\x1b")
-		if end < 0 {
-			return open
-		}
-		end += len(linkStart)
-		stop := end + 1
-		if text[end] == '\x1b' {
-			stop = min(end+2, len(text))
-		}
-		// it holds parameters, a semicolon and the address; no address closes the link
-		if _, address, _ := strings.Cut(text[len(linkStart):end], ";"); address == "" {
-			open = ""
-		} else {
-			open = text[:stop]
-		}
-		text = text[stop:]
+// linkSequence returns the hyperlink sequence that text starts with and the address it
+// links to, which is empty for the sequence that closes a link. It returns two empty
+// strings for a sequence that does not end.
+func linkSequence(text string) (sequence, address string) {
+	// the sequence ends at a bell or at an escape and a backslash
+	end := strings.IndexAny(text[len(linkStart):], "\a\x1b")
+	if end < 0 {
+		return "", ""
 	}
+	end += len(linkStart)
+	stop := end + 1
+	if text[end] == '\x1b' {
+		if stop == len(text) || text[stop] != '\\' {
+			return "", ""
+		}
+		stop++
+	}
+	// it holds parameters, a semicolon and the address
+	_, address, _ = strings.Cut(text[len(linkStart):end], ";")
+	return text[:stop], address
 }
 
 // fill sets the block to text at exactly width by height. Lines over height are cut from
@@ -177,7 +200,11 @@ func (b *block) stack(parts []*block, group, total int, align lipgloss.Position,
 			if len(lines) >= height {
 				break
 			}
-			if left > 0 || right > 0 {
+			switch {
+			case right < 0:
+				// a part wider than the block is cut at the block's edge
+				line = spaces(left) + fitLine(line, total-left)
+			case left > 0 || right > 0:
 				line = spaces(left) + line + spaces(right)
 			}
 			lines = append(lines, line)

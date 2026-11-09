@@ -44,18 +44,14 @@ func (t *Table) newSlot() *slot {
 }
 
 // newSlotCell returns the cell that shows the i-th visible column in the slot. Its
-// content is the slot's text cut to the room in the cell, which is cut again only when
-// the text or the room changes.
+// content is the slot's text cut to the room the cell has for it, which is cut again
+// only when the text or the room changes.
 func (t *Table) newSlotCell(s *slot, i int) *flexbox.Cell {
 	column := t.columnVisibleLeftIndex + i
 	s.widths[i] = -1
 	return flexbox.NewCell(t.columnRatio[column], 1).
 		SetMinWidth(t.columnMinWidth[column]).
 		SetContentGenerator(func(width, _ int) string {
-			if s.cursor == i {
-				// the padding of the cursor cell's style lies inside the cell's area
-				width -= t.cursorPadding
-			}
 			if s.widths[i] != width {
 				s.fitted[i], s.widths[i] = cut(s.texts[i], width), width
 			}

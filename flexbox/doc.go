@@ -78,8 +78,9 @@
 //
 // GetBounds on a cell, row or column returns the rectangle the last layout gave it,
 // counted in columns and lines from the top left corner of its box. GetContentBounds on
-// a cell returns the rectangle inside its border and margins. CellAt returns the cell
-// that shows at a point, which turns the position of a mouse click into a cell.
+// a cell returns the rectangle its content has, inside its margins, border and padding.
+// CellAt returns the cell that shows at a point, which turns the position of a mouse
+// click into a cell.
 //
 // The coordinates belong to the box. A box that renders somewhere else than at the top
 // left corner of the screen has its own position to add: a box nested in a cell starts
@@ -87,8 +88,9 @@
 //
 // # Nesting
 //
-// A content generator receives the area inside the cell's border and margins. A box, a
-// table or any other component nests in a cell by taking that size and rendering:
+// A content generator receives the room its content has, inside the cell's margins,
+// border and padding. A box, a table or any other component nests in a cell by taking
+// that size and rendering:
 //
 //	cell.SetContentGenerator(func(width, height int) string {
 //		return inner.SetWidth(width).SetHeight(height).Render()

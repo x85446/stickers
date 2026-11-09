@@ -61,10 +61,6 @@ type Table struct {
 	// stylesVersion changes whenever the styles or the style passing do
 	stylesVersion int
 	stylePassing  bool
-	// cursorPadding and footerPadding are the horizontal padding of the cursor cell's
-	// style and the footer's, which their texts have to leave free
-	cursorPadding int
-	footerPadding int
 
 	// the header, the rows and the footer are a box each, which keeps every part at
 	// exactly its size whatever its style
@@ -91,6 +87,7 @@ type Table struct {
 	footerSet bool
 	out       string
 	parts     [3]string
+	outHeight int
 	rendered  bool
 }
 
@@ -120,7 +117,7 @@ func NewTable(width, height int, columnHeaders []string) *Table {
 		rowsStale:   true,
 	}
 	t.footerCell = flexbox.NewCell(1, 1).SetContentGenerator(func(width, _ int) string {
-		return t.footerText(width - t.footerPadding)
+		return t.footerText(width)
 	})
 	t.footerBox.AddRows([]*flexbox.Row{t.footerBox.NewRow().AddCells(t.footerCell)})
 	t.SetStyles(nil)
@@ -259,10 +256,11 @@ func (t *Table) Render() string {
 	if t.height > 1 {
 		parts[2] = t.footerBox.Render()
 	}
-	if t.rendered && parts == t.parts {
+	// a table without columns to show has three empty parts at every height
+	if t.rendered && parts == t.parts && t.height == t.outHeight {
 		return t.out
 	}
-	t.parts, t.rendered = parts, true
+	t.parts, t.outHeight, t.rendered = parts, t.height, true
 
 	t.out = parts[0]
 	if t.rowsBoxHeight > 0 {

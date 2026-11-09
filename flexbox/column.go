@@ -153,9 +153,22 @@ func (c *Column) layout(from inherited) {
 	passed := c.style.passed()
 	for i, cell := range c.cells {
 		cell.style.resolve(passed)
-		cell.width, cell.height = scale(cell.ratioX, largest, width), tracks[i].size
+		tracks[i].cross = scale(cell.ratioX, largest, width)
+		cell.width, cell.height = tracks[i].cross, tracks[i].size
 	}
 	c.tracks = tracks
+}
+
+// laidOut reports whether every cell still has the size the last layout of this column
+// gave it. A cell that sits in another column too has that column's size after the box
+// laid out all of its columns.
+func (c *Column) laidOut() bool {
+	for i, cell := range c.cells {
+		if cell.width != c.tracks[i].cross || cell.height != c.tracks[i].size {
+			return false
+		}
+	}
+	return true
 }
 
 // contentBounds returns the rectangle the cells of the column show in.
@@ -192,7 +205,11 @@ func (c *Column) place(x, y int) {
 // The cells are stacked, left edges aligned. A cell without lines takes no room, and
 // anything taller than the column is cut at the column's bottom edge.
 func (c *Column) render(from inherited) *block {
-	c.layout(from)
+	// the box laid the column out already; a cell that sits in another column too has
+	// that column's size by now and gets this column's back
+	if !c.laidOut() {
+		c.layout(from)
+	}
 
 	key := containerKey{width: max(c.width, 0), height: max(c.height, 0), style: c.style.id}
 	stale := !c.rendered || key != c.key || len(c.revs) != len(c.cells)
@@ -222,8 +239,9 @@ func (c *Column) render(from inherited) *block {
 	}
 	group := widest(c.parts)
 	c.out.stack(c.parts, group, group, lipgloss.Left, height)
-	f, content := c.style.frame, c.out.String()
-	text := renderStyled(f.sized(c.style.around(content), key.width, key.height), content)
+	f := c.style.frame
+	style, content := c.style.dress(c.out.String())
+	text := renderStyled(f.sized(style, key.width, key.height), content)
 	c.out.fill(text, key.width, key.height, f.top, f.bottom)
 	return &c.out
 }

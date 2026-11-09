@@ -56,8 +56,6 @@ func (t *Table) SetStyles(styles map[StyleKey]lipgloss.Style) *Table {
 	}
 	t.styles = merged
 	t.stylesVersion++
-	t.cursorPadding = merged[StyleKeyCellCursor].GetHorizontalPadding()
-	t.footerPadding = merged[StyleKeyFooter].GetHorizontalPadding()
 	t.footerCell.SetStyle(merged[StyleKeyFooter])
 	t.headerStale, t.rowsStale = true, true
 	return t

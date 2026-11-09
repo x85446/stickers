@@ -154,18 +154,31 @@ func (r *Row) layout(from inherited) {
 	r.cellsWidth = 0
 	for i, c := range r.cells {
 		c.style.resolve(passed)
-		c.width, c.height = tracks[i].size, scale(c.ratioY, largest, height)
+		tracks[i].cross = scale(c.ratioY, largest, height)
+		c.width, c.height = tracks[i].size, tracks[i].cross
 		r.cellsWidth += max(c.width, 0)
 	}
 	r.tracks = tracks
 }
 
+// laidOut reports whether every cell still has the size the last layout of this row
+// gave it. A cell that sits in another row too has that row's size after the box laid
+// out all of its rows.
+func (r *Row) laidOut() bool {
+	for i, c := range r.cells {
+		if c.width != r.tracks[i].size || c.height != r.tracks[i].cross {
+			return false
+		}
+	}
+	return true
+}
+
 // shownWidth returns the columns the rendered row takes: its cells, cut at the row's
-// edge, inside its frame.
+// edge, inside its frame, and never more than the row's width.
 func (r *Row) shownWidth() int {
 	width, _ := r.contentSize()
 	f := r.style.frame
-	return min(r.cellsWidth, width) + f.edgeX + f.paddingX
+	return max(min(min(r.cellsWidth, width)+f.edgeX+f.paddingX, r.width), 0)
 }
 
 // contentBounds returns the rectangle the cells of the row show in.
@@ -186,14 +199,19 @@ func (r *Row) place(x, y int) {
 	}
 }
 
-// render returns the row as a block of exactly its height, building it only when its
-// size, its style or one of its cells changed since the last render.
+// render returns the row as a block of exactly its height and at most its width,
+// building it only when its size, its style or one of its cells changed since the last
+// render.
 //
 // The cells are joined side by side, tops aligned, and anything wider than the row, such
 // as a fixed-width cell wider than the box, is cut at the row's edge, never wrapped. A
 // row narrower than the box keeps its width so the box can align it.
 func (r *Row) render(from inherited) *block {
-	r.layout(from)
+	// the box laid the row out already; a cell that sits in another row too has that
+	// row's size by now and gets this row's back
+	if !r.laidOut() {
+		r.layout(from)
+	}
 
 	key := containerKey{width: max(r.width, 0), height: max(r.height, 0), style: r.style.id}
 	stale := !r.rendered || key != r.key || len(r.revs) != len(r.cells)
@@ -225,8 +243,10 @@ func (r *Row) render(from inherited) *block {
 			content = spaces(r.out.width)
 		}
 		f := r.style.frame
-		text := r.style.around(content).Height(key.height - f.marginY).Render(content)
-		r.out.fill(text, textWidth(text), key.height, f.top, f.bottom)
+		style, content := r.style.dress(content)
+		text := style.Height(key.height - f.marginY).Render(content)
+		// a frame wider than the row is cut at the row's edge like its cells
+		r.out.fill(text, min(textWidth(text), key.width), key.height, f.top, f.bottom)
 	}
 	return &r.out
 }

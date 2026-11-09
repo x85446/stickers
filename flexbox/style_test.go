@@ -143,19 +143,50 @@ func TestHyperlinksStayInTheirElement(t *testing.T) {
 	}
 }
 
-func TestLinkAfter(t *testing.T) {
-	a, b := "\x1b]8;;https://a\a", "\x1b]8;id=1;https://b\x1b\\"
-	for _, tc := range []struct{ text, open, want string }{
-		{"plain", "", ""},
-		{"plain", a, a},
-		{a + "text", "", a},
-		{a + "text" + ansi.ResetHyperlink(), "", ""},
-		{"text\x1b]8;;\x1b\\", a, ""},
-		{a + "x" + ansi.ResetHyperlink() + b + "y", "", b},
-		{"cut \x1b]8;;https://", a, a},
+func TestLinkSequence(t *testing.T) {
+	for _, tc := range []struct{ text, sequence, address string }{
+		{"\x1b]8;;https://a\atext", "\x1b]8;;https://a\a", "https://a"},
+		{"\x1b]8;id=1;https://b\x1b\\text", "\x1b]8;id=1;https://b\x1b\\", "https://b"},
+		{"\x1b]8;;\atext", "\x1b]8;;\a", ""},
+		{"\x1b]8;;\x1b\\", "\x1b]8;;\x1b\\", ""},
+		{"\x1b]8;;https://cut", "", ""},
+		{"\x1b]8;;https://cut\x1b", "", ""},
+		{"\x1b]8;;https://cut\x1b[m", "", ""},
 	} {
-		if got := linkAfter(tc.text, tc.open); got != tc.want {
-			t.Errorf("linkAfter(%q, %q) = %q, want %q", tc.text, tc.open, got, tc.want)
+		if sequence, address := linkSequence(tc.text); sequence != tc.sequence || address != tc.address {
+			t.Errorf("linkSequence(%q) = %q, %q, want %q, %q", tc.text, sequence, address, tc.sequence, tc.address)
+		}
+	}
+}
+
+// TestIsolateLinks: every line closes the link it has open and the next line opens it
+// again, and a link around another one comes back when the inner one closes.
+func TestIsolateLinks(t *testing.T) {
+	a, b, closed := "\x1b]8;;https://a\a", "\x1b]8;;https://b\a", ansi.ResetHyperlink()
+	for _, tc := range []struct {
+		name     string
+		in, want []string
+	}{
+		{"no links", []string{"plain", "text"}, []string{"plain", "text"}},
+		{"closed on its line", []string{a + "x" + closed + "y"}, []string{a + "x" + closed + "y"}},
+		{"open over three lines", []string{a + "x", "y", "z" + closed + "w", "v"},
+			[]string{a + "x" + closed, a + "y" + closed, a + "z" + closed + "w", "v"}},
+		{"a link inside another", []string{a + "x" + b + "y" + closed + "z" + closed + "w"},
+			[]string{a + "x" + b + "y" + closed + a + "z" + closed + "w"}},
+		{"an inner link over a line end", []string{a + "x" + b + "y", "z" + closed + "w", "v" + closed},
+			[]string{a + "x" + b + "y" + closed, b + "z" + closed + a + "w" + closed, a + "v" + closed}},
+		{"a close without an open", []string{"x" + closed + "y"}, []string{"x" + closed + "y"}},
+		{"never closed", []string{a + "x", "y"}, []string{a + "x" + closed, a + "y" + closed}},
+	} {
+		got := append([]string(nil), tc.in...)
+		isolateLinks(got)
+		if strings.Join(got, "\n") != strings.Join(tc.want, "\n") {
+			t.Errorf("%s:\n got %q\nwant %q", tc.name, got, tc.want)
+		}
+		for i := range got {
+			if ansi.Strip(got[i]) != ansi.Strip(tc.in[i]) {
+				t.Errorf("%s: line %d changed its text", tc.name, i)
+			}
 		}
 	}
 }
@@ -198,3 +229,96 @@ func TestLinkedContentWrapsInsideItsCell(t *testing.T) {
 }
 
 func ptr[T any](v T) *T { return &v }
+
+// TestUnderlineRunsThroughStyledContent: a cell, or a row, that underlines or strikes
+// through keeps the escape sequences of styled content whole and draws its lines under
+// all of it, also after the content resets its own color.
+func TestUnderlineRunsThroughStyledContent(t *testing.T) {
+	under := lipgloss.NewStyle().Underline(true)
+	red := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Render("red")
+	linked := lipgloss.NewStyle().Hyperlink("https://example.com").Render("link")
+
+	for name, style := range map[string]lipgloss.Style{
+		"underline":        under,
+		"strikethrough":    lipgloss.NewStyle().Strikethrough(true),
+		"curly underline":  lipgloss.NewStyle().UnderlineStyle(lipgloss.UnderlineCurly).UnderlineColor(lipgloss.Color("#00ff00")),
+		"underline spaces": lipgloss.NewStyle().UnderlineSpaces(true),
+	} {
+		for _, content := range []string{red + " and plain", linked, "plain " + red + "\nsecond " + red} {
+			// the style on the cell itself, and passed down by the row
+			own := New(18, 2)
+			own.AddRows([]*Row{own.NewRow().AddCells(NewCell(1, 1).SetStyle(style).SetContent(content))})
+			passed := New(18, 2)
+			passed.AddRows([]*Row{passed.NewRow().UseStyle(style).AddCells(NewCell(1, 1).SetContent(content))})
+			want := New(18, 2)
+			want.AddRows([]*Row{want.NewRow().AddCells(NewCell(1, 1).SetContent(content))})
+			for kind, box := range map[string]*FlexBox{"on the cell": own, "passed by the row": passed} {
+				rendered := box.Render()
+				assertSize(t, rendered, 18, 2)
+				if got := ansi.Strip(rendered); got != ansi.Strip(want.Render()) {
+					t.Errorf("%s %s shows %q for %q", name, kind, got, content)
+				}
+			}
+		}
+	}
+
+	// the line is drawn under the colored word and again after its reset
+	box := New(14, 1)
+	box.AddRows([]*Row{box.NewRow().AddCells(NewCell(1, 1).SetStyle(under).SetContent(red + " after"))})
+	rendered := box.Render()
+	on := "\x1b[4m"
+	if !strings.HasPrefix(rendered, on) || !strings.Contains(rendered, "red\x1b[m"+on+" after") {
+		t.Errorf("the underline does not run through the styled content: %q", rendered)
+	}
+
+	// a row keeps the underline on its plain cells when another cell is colored
+	row := New(12, 1)
+	row.AddRows([]*Row{row.NewRow().SetStyle(under).AddCells(NewCell(1, 1).SetContent("ab"), NewCell(1, 1).SetContent(red))})
+	if rendered := row.Render(); !strings.HasPrefix(rendered, on+"ab") || ansi.Strip(rendered) != "ab    red   " {
+		t.Errorf("an underlined row with a colored cell renders %q", rendered)
+	}
+}
+
+func TestRelined(t *testing.T) {
+	on, off := "\x1b[4m", "\x1b[24m"
+	for _, tc := range []struct{ text, want string }{
+		{"plain", on + "plain" + off},
+		{"a\n\nb", on + "a" + off + "\n\n" + on + "b" + off},
+		{"\x1b[31mred\x1b[m after", on + "\x1b[31mred\x1b[m" + on + " after" + off},
+		{"\x1b[0;1mbold", on + "\x1b[0;1m" + on + "bold" + off},
+		{"\x1b[38;2;0;0;0mblack\x1b[38;5;0m", on + "\x1b[38;2;0;0;0mblack\x1b[38;5;0m" + off},
+		{"\x1b[2Kcleared", on + "\x1b[2Kcleared" + off},
+		{"cut \x1b[31", on + "cut \x1b[31" + off},
+	} {
+		if got := relined(tc.text, on, off); got != tc.want {
+			t.Errorf("relined(%q) = %q, want %q", tc.text, got, tc.want)
+		}
+	}
+	if got := relined("text", "", ""); got != "text" {
+		t.Errorf("relined without lines changed the text to %q", got)
+	}
+}
+
+// TestRowLinkComesBackAfterACellLink: a hyperlink on a row covers the cells after one
+// that has a link of its own.
+func TestRowLinkComesBackAfterACellLink(t *testing.T) {
+	rowLink, cellLink := "\x1b]8;;https://row.example\a", "\x1b]8;;https://cell.example\a"
+	box := New(9, 1)
+	box.AddRows([]*Row{box.NewRow().SetStyle(lipgloss.NewStyle().Hyperlink("https://row.example")).AddCells(
+		NewCell(1, 1).SetContent("aa"),
+		NewCell(1, 1).SetStyle(lipgloss.NewStyle().Hyperlink("https://cell.example")).SetContent("bb"),
+		NewCell(1, 1).SetContent("cc"),
+	)})
+	rendered := box.Render()
+	if ansi.Strip(rendered) != "aa bb cc " {
+		t.Fatalf("the row shows %q", ansi.Strip(rendered))
+	}
+	inRow := func(text string) bool {
+		before, _, _ := strings.Cut(rendered, text)
+		return strings.LastIndex(before, rowLink) > strings.LastIndex(before, ansi.ResetHyperlink()) &&
+			strings.LastIndex(before, rowLink) > strings.LastIndex(before, cellLink)
+	}
+	if !inRow("aa") || !inRow("cc") || inRow("bb") {
+		t.Errorf("the row's link does not cover the first and the last cell alone: %q", rendered)
+	}
+}

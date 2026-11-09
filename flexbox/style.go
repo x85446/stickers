@@ -5,6 +5,7 @@ import (
 	"sync/atomic"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // keeper marks the end of a text whose trailing spaces a style must keep: a zero-width
@@ -96,8 +97,11 @@ type styling struct {
 	id        uint64 // identity of effective; 0 while it is the empty style
 	frame     frame  // sizes of effective
 	// runeByRune is true when effective underlines or strikes through, which
-	// lipgloss writes one rune at a time
+	// lipgloss writes one rune at a time. linesOn and linesOff are the escape
+	// sequences that start and end those lines.
 	runeByRune bool
+	linesOn    string
+	linesOff   string
 
 	// what effective was resolved from
 	resolved     bool
@@ -122,10 +126,11 @@ func (s *styling) resolve(from inherited) {
 		s.effective = s.own.Inherit(*from.style)
 		s.id = nextID()
 	}
-	s.frame, s.runeByRune = frame{}, false
+	s.frame, s.runeByRune, s.linesOn, s.linesOff = frame{}, false, "", ""
 	if s.id != 0 {
 		s.runeByRune = s.effective.GetUnderline() || s.effective.GetStrikethrough() ||
 			s.effective.GetUnderlineSpaces() || s.effective.GetStrikethroughSpaces()
+		s.linesOn, s.linesOff = lineSequences(s.effective)
 		s.frame = frame{
 			top:         s.effective.GetMarginTop() + s.effective.GetBorderTopSize(),
 			bottom:      s.effective.GetBorderBottomSize() + s.effective.GetMarginBottom(),
@@ -144,17 +149,103 @@ func (s *styling) resolve(from inherited) {
 	s.resolved, s.resolvedOwn, s.resolvedFrom = true, s.ownID, from.id
 }
 
-// around returns the style a row, column or box renders around content its children
-// rendered. Lipgloss writes underline and strikethrough one rune at a time, which cuts
-// the escape sequences of styled children apart, so content that carries any is left
-// without the two; children that inherit the style show them themselves.
-func (s *styling) around(content string) lipgloss.Style {
+// dress returns the style and the content an element renders with.
+//
+// Lipgloss writes underline and strikethrough one rune at a time, which cuts the escape
+// sequences of content that is styled itself apart: a colored value, a hyperlink, the
+// cells of a row. For such content the style is returned without the two, and the
+// content with the sequences that draw them written around every line, and again after
+// every reset inside it. Content without escape sequences is left to lipgloss.
+func (s *styling) dress(content string) (lipgloss.Style, string) {
 	if !s.runeByRune || !strings.Contains(content, "\x1b") {
-		return s.effective
+		return s.effective, content
 	}
-	return s.effective.
+	style := s.effective.
 		UnsetUnderline().UnsetUnderlineSpaces().
 		UnsetStrikethrough().UnsetStrikethroughSpaces()
+	return style, relined(content, s.linesOn, s.linesOff)
+}
+
+// lineSequences returns the escape sequences that start and end the underline and the
+// strikethrough of style, or two empty strings when it has neither.
+func lineSequences(style lipgloss.Style) (on, off string) {
+	var start ansi.Style
+	var end []string
+	if style.GetUnderline() {
+		start, end = start.UnderlineStyle(style.GetUnderlineStyle()), append(end, "24")
+		if c := style.GetUnderlineColor(); c != (lipgloss.NoColor{}) {
+			start, end = start.UnderlineColor(c), append(end, "59")
+		}
+	}
+	if style.GetStrikethrough() {
+		start, end = start.Strikethrough(true), append(end, "29")
+	}
+	if len(start) == 0 {
+		return "", ""
+	}
+	return start.String(), "\x1b[" + strings.Join(end, ";") + "m"
+}
+
+// relined writes on at the start of every line of text that has any, and again after
+// every escape sequence in it that resets the text attributes, and off at its end.
+func relined(text, on, off string) string {
+	if on == "" {
+		return text
+	}
+	var b strings.Builder
+	first := true
+	for line := range strings.SplitSeq(text, "\n") {
+		if !first {
+			b.WriteByte('\n')
+		}
+		first = false
+		if line == "" {
+			continue
+		}
+		b.WriteString(on)
+		for {
+			start := strings.Index(line, "\x1b[")
+			if start < 0 {
+				break
+			}
+			// parameters run up to the letter that ends the sequence
+			end := start + 2
+			for end < len(line) && (line[end] < '@' || line[end] > '~') {
+				end++
+			}
+			if end == len(line) {
+				break
+			}
+			b.WriteString(line[:end+1])
+			if line[end] == 'm' && resetsAttributes(line[start+2:end]) {
+				b.WriteString(on)
+			}
+			line = line[end+1:]
+		}
+		b.WriteString(line)
+		b.WriteString(off)
+	}
+	return b.String()
+}
+
+// resetsAttributes reports whether the parameters of a text attribute sequence turn
+// every attribute off: one of them is empty or 0, outside the numbers of a color.
+func resetsAttributes(params string) bool {
+	fields := strings.Split(params, ";")
+	for i := 0; i < len(fields); i++ {
+		switch fields[i] {
+		case "", "0":
+			return true
+		case "38", "48", "58":
+			// a color follows as 5;n or 2;r;g;b
+			if i+1 < len(fields) && fields[i+1] == "5" {
+				i += 2
+			} else if i+1 < len(fields) && fields[i+1] == "2" {
+				i += 4
+			}
+		}
+	}
+	return false
 }
 
 // passed returns what the element passes to its children: its effective style when

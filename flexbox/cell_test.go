@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 func bordered() lipgloss.Style { return lipgloss.NewStyle().Border(lipgloss.NormalBorder()) }
@@ -250,4 +251,24 @@ func TestStyledContentInAPlainCellStaysInTheCell(t *testing.T) {
 		}
 	}
 	plainAndStyled(t, red, 10, 3)
+}
+
+// TestContentLeftOpenTakesNoExtraLine: content that ends inside a color or a hyperlink
+// sits where plain content sits, also at the bottom of its cell.
+func TestContentLeftOpenTakesNoExtraLine(t *testing.T) {
+	bottom := lipgloss.NewStyle().AlignVertical(lipgloss.Bottom)
+	for _, content := range []string{"red", "\x1b[31mred", "\x1b[31mred\x1b[0m", "\x1b]8;;https://x.y\ared", "red  "} {
+		for _, cell := range []*Cell{NewCell(1, 1).SetStyle(bottom), NewCell(1, 1).SetStyle(bordered().AlignVertical(lipgloss.Bottom))} {
+			box := New(6, 5)
+			box.AddRows([]*Row{box.NewRow().AddCells(cell.SetContent(content))})
+			got := strings.Split(ansi.Strip(box.Render()), "\n")
+			last := got[len(got)-1]
+			if cell.GetStyle().GetBorderTopSize() > 0 {
+				last = got[len(got)-2]
+			}
+			if !strings.Contains(last, "red") {
+				t.Errorf("content %q does not sit on the last line of its cell:\n%s", content, strings.Join(got, "\n"))
+			}
+		}
+	}
 }

@@ -1,10 +1,12 @@
 package flexbox
 
 import (
+	"image"
 	"strings"
 	"testing"
 
 	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // lines renders box and returns its lines.
@@ -281,8 +283,12 @@ func TestContentGeneratorGetsTheContentArea(t *testing.T) {
 	box := New(20, 10)
 	box.AddRows([]*Row{box.NewRow().AddCells(cell)})
 	box.Render()
-	if gotWidth != 16 || gotHeight != 6 {
-		t.Fatalf("generator got %dx%d, want 16x6", gotWidth, gotHeight)
+	// 20x10 less a margin of 1, a border of 1 and a padding of 1 left and right
+	if gotWidth != 14 || gotHeight != 6 {
+		t.Fatalf("generator got %dx%d, want 14x6", gotWidth, gotHeight)
+	}
+	if got := cell.GetContentBounds(); got != image.Rect(3, 2, 17, 8) {
+		t.Fatalf("content bounds %v, want (3,2)-(17,8)", got)
 	}
 	if w, h := cell.GetWidth(), cell.GetHeight(); w != 20 || h != 10 {
 		t.Fatalf("cell is %dx%d, want 20x10", w, h)
@@ -472,4 +478,64 @@ func TestSetRowsKeepsItsOwnList(t *testing.T) {
 	assertLines(t, lines(box), "a   ", "b   ")
 	box.SetRows(rows[:1])
 	assertLines(t, lines(box), "b   ", "    ")
+}
+
+// TestGeneratorReadsThePositionOfItsRender: a content generator that asks for its cell's
+// bounds gets the bounds of the render it is called for, from the first one on.
+func TestGeneratorReadsThePositionOfItsRender(t *testing.T) {
+	var second *Cell
+	second = NewCell(1, 1).SetContentGenerator(func(_, _ int) string { return second.GetBounds().String() })
+	box := New(40, 1)
+	box.AddRows([]*Row{box.NewRow().AddCells(NewCell(1, 1), second)})
+	assertLines(t, lines(box), "                    (20,0)-(40,1)       ")
+	box.SetWidth(30)
+	assertLines(t, lines(box), "               (15,0)-(30,1)  ")
+
+	var cell *Cell
+	cell = NewCell(1, 1).SetContentGenerator(func(_, _ int) string { return cell.GetBounds().String() })
+	horizontal := NewHorizontal(40, 1)
+	horizontal.AddColumns([]*Column{horizontal.NewColumn().AddCells(NewCell(1, 1)), horizontal.NewColumn().AddCells(cell)})
+	assertLines(t, lines(horizontal), "                    (20,0)-(40,1)       ")
+}
+
+// TestRowFrameWiderThanTheBoxIsCut: a row whose frame alone is wider than the box is cut
+// at the box's edge and leaves the rows that fit where they are.
+func TestRowFrameWiderThanTheBoxIsCut(t *testing.T) {
+	for _, boxStyle := range []lipgloss.Style{lipgloss.NewStyle(), lipgloss.NewStyle().Bold(true)} {
+		box := New(8, 6).SetRowAlign(lipgloss.Right).SetStyle(boxStyle)
+		wide := box.NewRow().SetStyle(bordered().Padding(0, 4)).AddCells(NewCell(1, 1))
+		top := NewCell(1, 1).SetContent("AAAAAAAA\nAAAAAAAA")
+		box.AddRows([]*Row{box.NewRow().AddCells(top), wide})
+		rendered := box.Render()
+		assertSize(t, rendered, 8, 6)
+		if got := strings.Split(ansi.Strip(rendered), "\n"); got[0] != "AAAAAAAA" || got[1] != "AAAAAAAA" {
+			t.Fatalf("the row that fits renders %q and %q", got[0], got[1])
+		}
+		if got := wide.GetBounds(); got.Dx() != 8 {
+			t.Fatalf("the wide row is %d columns wide, want the 8 of the box", got.Dx())
+		}
+		if box.CellAt(3, 0) != top {
+			t.Fatal("CellAt does not find the cell of the row that fits")
+		}
+	}
+}
+
+// TestCellInTwoRowsKeepsTheBoxItsSize: a cell added to two rows has one size, and the box
+// is its size all the same.
+func TestCellInTwoRowsKeepsTheBoxItsSize(t *testing.T) {
+	shared := NewCell(1, 1).SetStyle(bordered()).SetContent("shared")
+	box := New(30, 8)
+	box.AddRows([]*Row{
+		box.NewRow().AddCells(shared, NewCell(3, 1).SetContent("wide")),
+		box.NewRow().AddCells(NewCell(1, 1).SetContent("a"), shared, NewCell(1, 1).SetContent("b")),
+	})
+	assertSize(t, box.Render(), 30, 8)
+	assertSize(t, box.Render(), 30, 8)
+
+	horizontal := NewHorizontal(30, 8)
+	horizontal.AddColumns([]*Column{
+		horizontal.NewColumn().AddCells(shared, NewCell(1, 3)).SetFixedWidth(6),
+		horizontal.NewColumn().AddCells(NewCell(1, 1), shared),
+	})
+	assertSize(t, horizontal.Render(), 30, 8)
 }

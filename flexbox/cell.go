@@ -93,9 +93,9 @@ func (c *Cell) SetContent(content string) *Cell {
 }
 
 // SetContentGenerator sets a function that builds the content each time the cell
-// renders. It receives the width and height inside the border and margins, never less
-// than 0; padding, if the style has any, lies inside that area. A cell without columns
-// or lines does not call it.
+// renders. It receives the width and height the content has room for, inside the cell's
+// margins, border and padding, never less than 0. A cell without columns or lines does
+// not call it.
 func (c *Cell) SetContentGenerator(generator func(maxX, maxY int) string) *Cell {
 	c.contentGenerator = generator
 	return c
@@ -186,18 +186,21 @@ func (c *Cell) GetBounds() image.Rectangle {
 	return image.Rect(c.x, c.y, c.x+max(c.width, 0), c.y+max(c.height, 0))
 }
 
-// GetContentBounds returns the rectangle inside the cell's border and margins, the area
-// a content generator fills, in the coordinates of GetBounds. It is where to place what
-// the content positions itself, such as a cursor or a box nested in the cell.
+// GetContentBounds returns the rectangle the content has, inside the cell's margins,
+// border and padding, in the coordinates of GetBounds. It is the area a content
+// generator fills, and where to place what the content positions itself, such as a
+// cursor or a box nested in the cell.
 func (c *Cell) GetContentBounds() image.Rectangle {
 	width, height := c.contentSize()
-	x, y := c.x+c.style.frame.left, c.y+c.style.frame.top
+	x, y := c.style.frame.inner(c.x, c.y)
 	return image.Rect(x, y, x+width, y+height)
 }
 
-// contentSize returns the area inside the cell's border and margins.
+// contentSize returns the room the content has, inside the cell's margins, border and
+// padding.
 func (c *Cell) contentSize() (width, height int) {
-	return max(c.width-c.style.frame.edgeX, 0), max(c.height-c.style.frame.edgeY(), 0)
+	f := c.style.frame
+	return max(c.width-f.edgeX-f.paddingX, 0), max(c.height-f.edgeY()-f.paddingY, 0)
 }
 
 // render returns the cell as a block of exactly its width by its height, building it
@@ -227,8 +230,8 @@ func (c *Cell) render(from inherited) *block {
 		c.out.fill(fitPlain(content, width, height), width, height, 0, 0)
 	default:
 		f := c.style.frame
-		fitted := fitContent(content, width-f.edgeX-f.paddingX, height-f.edgeY()-f.paddingY)
-		text := renderStyled(f.sized(c.style.effective, width, height), fitted)
+		style, fitted := c.style.dress(fitContent(content, width-f.edgeX-f.paddingX, height-f.edgeY()-f.paddingY))
+		text := renderStyled(f.sized(style, width, height), fitted)
 		c.out.fill(text, width, height, f.top, f.bottom)
 	}
 	return &c.out
@@ -288,8 +291,12 @@ func fitContent(content string, width, height int) string {
 		content = strings.ReplaceAll(content, "\t", "    ")
 	}
 	// the wrap drops the spaces at the very end of its input; a newline after the
-	// last line keeps them
-	wrapped := strings.TrimSuffix(cellbuf.Wrap(content+"\n", width, ""), "\n")
+	// last line keeps them. After that newline the wrap writes nothing but the escape
+	// sequences of a color or link the content left open, which go with it.
+	wrapped := cellbuf.Wrap(content+"\n", width, "")
+	if last := strings.LastIndexByte(wrapped, '\n'); last >= 0 && ansi.Strip(wrapped[last+1:]) == "" {
+		wrapped = wrapped[:last]
+	}
 	return cutLines(firstLines(wrapped, height), width)
 }
 

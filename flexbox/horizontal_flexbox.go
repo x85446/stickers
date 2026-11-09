@@ -164,7 +164,7 @@ func (b *HorizontalFlexBox) GetWidth() int {
 // or content changed, a column when one of its cells did. An unchanged grid costs a call
 // to each content generator.
 func (b *HorizontalFlexBox) Render() string {
-	b.layout()
+	b.arrange()
 
 	key := containerKey{width: max(b.width, 0), height: max(b.height, 0), style: b.style.id, align: b.columnAlign}
 	stale := !b.rendered || key != b.key || len(b.revs) != len(b.columns)
@@ -177,7 +177,6 @@ func (b *HorizontalFlexBox) Render() string {
 		}
 		b.parts = append(b.parts, part)
 	}
-	b.place()
 	if !stale {
 		return b.out
 	}
@@ -190,8 +189,9 @@ func (b *HorizontalFlexBox) Render() string {
 	b.frame.join(b.parts, height, left, right)
 	b.frame.clip(width)
 	if !b.style.plain() {
-		f, content := b.style.frame, b.frame.String()
-		text := renderStyled(f.sized(b.style.around(content), key.width, key.height), content)
+		f := b.style.frame
+		style, content := b.style.dress(b.frame.String())
+		text := renderStyled(f.sized(style, key.width, key.height), content)
 		b.frame.fill(text, key.width, key.height, f.top, f.bottom)
 	}
 	b.out = b.frame.String()
@@ -201,6 +201,12 @@ func (b *HorizontalFlexBox) Render() string {
 // ForceRecalculate lays out the box and every column now, so the sizes and positions of
 // columns and cells can be read before the next render.
 func (b *HorizontalFlexBox) ForceRecalculate() {
+	b.arrange()
+}
+
+// arrange sizes and places the columns and their cells. Render does it before anything
+// renders, so a content generator that reads a position reads the one of this render.
+func (b *HorizontalFlexBox) arrange() {
 	b.layout()
 	passed := b.style.passed()
 	for _, column := range b.columns {
@@ -214,7 +220,7 @@ func (b *HorizontalFlexBox) ForceRecalculate() {
 // narrower than its column, or outside the box. It answers for the box as it is now,
 // which is what the last render showed unless something changed since.
 func (b *HorizontalFlexBox) CellAt(x, y int) *Cell {
-	b.ForceRecalculate()
+	b.arrange()
 	point := image.Pt(x, y)
 	inside := b.contentBounds()
 	for _, column := range b.columns {

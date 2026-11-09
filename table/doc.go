@@ -29,9 +29,10 @@
 //
 // # Mouse
 //
-// ColumnAt and RowAt turn a position on the rendered table into a column and a row, and
-// SetCursorLocation moves the cursor to them. Line 0 is the header, so a click there
-// names the column to sort by.
+// CellAt turns a position on the rendered table into a column and a row, and
+// SetCursorLocation moves the cursor to them. Line 0 is the header: ColumnAt names the
+// column whose header shows at a position there, the column to sort by. RowAt names the
+// row on a line.
 //
 // # Styles
 //

@@ -816,8 +816,10 @@ func TestMouseFindsRowsAndColumns(t *testing.T) {
 	}
 
 	// a click on line 3, column 25 selects the third row and the third column
-	row, _ := tb.RowAt(3)
-	column, _ := tb.ColumnAt(25)
+	column, row, ok := tb.CellAt(25, 3)
+	if !ok {
+		t.Fatal("CellAt found no cell at a row")
+	}
 	tb.SetCursorLocation(column, row)
 	if x, y := tb.GetCursorLocation(); x != 2 || y != 2 || tb.GetCursorValue() != "c2" {
 		t.Fatalf("cursor at %d:%d on %q, want 2:2 on c2", x, y, tb.GetCursorValue())
@@ -864,5 +866,77 @@ func TestMouseFindsRowsAndColumns(t *testing.T) {
 	}
 	if _, ok := empty.ColumnAt(0); ok {
 		t.Fatal("ColumnAt found a column in a table without columns")
+	}
+}
+
+// TestCellAtFollowsTheRowsAndColumnAtTheHeader: with frames on the styles, the header's
+// cells and the rows' cells are in different places, and each method answers for its
+// own line.
+func TestCellAtFollowsTheRowsAndColumnAtTheHeader(t *testing.T) {
+	rows := func() *Table {
+		return NewTable(20, 4, []string{"A", "B"}).MustAddRows([][]any{{"a", "b"}, {"c", "d"}})
+	}
+	at := func(tb *Table, x, y int) string {
+		column, row, ok := tb.CellAt(x, y)
+		if !ok {
+			return "none"
+		}
+		return strconv.Itoa(column) + ":" + strconv.Itoa(row)
+	}
+
+	padded := rows().SetStyles(map[StyleKey]lipgloss.Style{StyleKeyHeader: lipgloss.NewStyle().Padding(0, 1)})
+	assertRendered(t, padded, " A        B         ", "a         b         ", "c         d         ", "          0:0 / 20:2")
+	if _, ok := padded.ColumnAt(0); ok {
+		t.Error("ColumnAt found a header on the header's padding")
+	}
+	if column, ok := padded.ColumnAt(1); !ok || column != 0 {
+		t.Errorf("ColumnAt(1) = %d, %v, want the first header", column, ok)
+	}
+	if got := at(padded, 0, 1); got != "0:0" {
+		t.Errorf("CellAt(0, 1) = %s, want 0:0", got)
+	}
+
+	// a row style with padding on the left moves the row's cells, not the header's
+	indented := rows().SetStyles(map[StyleKey]lipgloss.Style{
+		StyleKeyRows:           lipgloss.NewStyle().PaddingLeft(4),
+		StyleKeyRowsSubsequent: lipgloss.NewStyle().PaddingLeft(4),
+		StyleKeyRowsCursor:     lipgloss.NewStyle().PaddingLeft(4),
+	})
+	assertRendered(t, indented, "A         B         ", "    a       b       ", "    c       d       ", "          0:0 / 20:2")
+	for _, tc := range []struct {
+		x, y int
+		want string
+	}{{0, 1, "none"}, {3, 1, "none"}, {4, 1, "0:0"}, {11, 2, "0:1"}, {12, 2, "1:1"}, {19, 1, "1:0"}, {20, 1, "none"}, {5, 0, "none"}, {5, 3, "none"}} {
+		if got := at(indented, tc.x, tc.y); got != tc.want {
+			t.Errorf("CellAt(%d, %d) = %s, want %s", tc.x, tc.y, got, tc.want)
+		}
+	}
+	if column, ok := indented.ColumnAt(10); !ok || column != 1 {
+		t.Errorf("ColumnAt(10) = %d, %v, want the second header", column, ok)
+	}
+
+	// a header without room for its frame shows no header, and a table without lines none
+	framed := rows().SetStyles(map[StyleKey]lipgloss.Style{StyleKeyHeader: lipgloss.NewStyle().Border(lipgloss.NormalBorder(), false, false, true, false)})
+	if _, ok := framed.ColumnAt(3); ok {
+		t.Error("ColumnAt found a header in a header line that shows a border")
+	}
+	if got := at(framed, 3, 1); got != "0:0" {
+		t.Errorf("CellAt(3, 1) = %s under a framed header, want 0:0", got)
+	}
+	flat := rows().SetHeight(0)
+	if _, ok := flat.ColumnAt(2); ok || at(flat, 2, 1) != "none" {
+		t.Error("a table without lines has a header or a cell")
+	}
+}
+
+// TestRenderFollowsTheHeightWithoutWidth: a table without columns to show renders its
+// current number of lines.
+func TestRenderFollowsTheHeightWithoutWidth(t *testing.T) {
+	tb := NewTable(0, 1, []string{"A"}).MustAddRows([][]any{{"a"}})
+	for _, height := range []int{1, 3, 2, 5, 1} {
+		got := tb.SetHeight(height).Render()
+		if n := strings.Count(got, "\n") + 1; n != height || lipgloss.Width(got) != 0 {
+			t.Fatalf("at %d lines the table renders %d lines of %d columns: %q", height, n, lipgloss.Width(got), got)
+		}
 	}
 }
