@@ -1,6 +1,6 @@
 package flexbox
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // FlexBox is a responsive grid of rows, each holding cells side by side. Rows stack
 // vertically and share the box height by ratio or fixed size.
@@ -158,9 +158,6 @@ func (b *FlexBox) GetWidth() int {
 // Only what changed since the last render is rendered again: a cell when its size, style
 // or content changed, a row when one of its cells did. An unchanged grid costs a call to
 // each content generator.
-//
-// Text styled by an earlier render is reused as it is. After changing how lipgloss
-// renders a style at run time, such as the color profile, set the styles again.
 func (b *FlexBox) Render() string {
 	b.layout()
 
@@ -191,10 +188,7 @@ func (b *FlexBox) Render() string {
 	} else {
 		b.frame.stack(b.parts, group, group, b.rowAlign, height)
 		f := b.style.frame
-		style := b.style.effective.
-			Width(key.width - f.edgeX).MaxWidth(key.width).
-			Height(key.height - f.edgeY())
-		text := renderStyled(style, b.frame.String())
+		text := renderStyled(f.sized(b.style.effective, key.width, key.height), b.frame.String())
 		b.frame.fill(text, key.width, key.height, f.top, f.bottom)
 	}
 	b.out = b.frame.String()
@@ -248,8 +242,8 @@ func appendElements[T any](dst, elements []*T) []*T {
 	return dst
 }
 
-// replaceElements returns the rows, columns or cells that are not nil in the storage of
-// dst, which no longer holds what it held before.
+// replaceElements returns the rows, columns or cells that are not nil. It reuses the
+// storage of dst and drops what dst held.
 func replaceElements[T any](dst, elements []*T) []*T {
 	replaced := appendElements(dst[:0], elements)
 	if len(replaced) < len(dst) {

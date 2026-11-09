@@ -4,10 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/x85446/stickers/table"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/x85446/stickers/v2/table"
 )
 
-// A table with typed columns, sorted by score, with the cursor on its second row.
+// A table with typed columns, sorted by score, with the cursor on its second row. The
+// example prints the table without its colors.
 func Example() {
 	t := table.NewTable(30, 5, []string{"ID", "Name", "Score"})
 	if _, err := t.SetTypes(0, "", 0.0); err != nil {
@@ -21,7 +23,7 @@ func Example() {
 	})
 	t.OrderByDesc(2).CursorDown()
 
-	for _, line := range strings.Split(t.Render(), "\n") {
+	for _, line := range strings.Split(ansi.Strip(t.Render()), "\n") {
 		fmt.Println(strings.TrimRight(line, " "))
 	}
 	fmt.Println("row under the cursor:", t.GetCursorRow())

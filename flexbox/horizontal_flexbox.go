@@ -1,6 +1,6 @@
 package flexbox
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // HorizontalFlexBox is a responsive grid of columns, each holding cells stacked
 // vertically. Columns sit side by side and share the box width by ratio or fixed size.
@@ -159,9 +159,6 @@ func (b *HorizontalFlexBox) GetWidth() int {
 // Only what changed since the last render is rendered again: a cell when its size, style
 // or content changed, a column when one of its cells did. An unchanged grid costs a call
 // to each content generator.
-//
-// Text styled by an earlier render is reused as it is. After changing how lipgloss
-// renders a style at run time, such as the color profile, set the styles again.
 func (b *HorizontalFlexBox) Render() string {
 	b.layout()
 
@@ -196,10 +193,7 @@ func (b *HorizontalFlexBox) Render() string {
 	b.frame.clip(width)
 	if !b.style.plain() {
 		f := b.style.frame
-		style := b.style.effective.
-			Width(key.width - f.edgeX).MaxWidth(key.width).
-			Height(key.height - f.edgeY())
-		text := renderStyled(style, b.frame.String())
+		text := renderStyled(f.sized(b.style.effective, key.width, key.height), b.frame.String())
 		b.frame.fill(text, key.width, key.height, f.top, f.bottom)
 	}
 	b.out = b.frame.String()

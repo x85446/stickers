@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/x/ansi"
-	"github.com/x85446/stickers/flexbox"
+	"github.com/x85446/stickers/v2/flexbox"
 )
 
 // slot is one line of the rows area: a flexbox row that shows whichever table row

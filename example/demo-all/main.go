@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
 	demo1 "github.com/x85446/stickers/example/demo-1-flex-box-simple"
 	demo10 "github.com/x85446/stickers/example/demo-10-flex-box-mixed-fixed"
@@ -86,7 +86,7 @@ func newModel() *model {
 
 func main() {
 	m := newModel()
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Error running demo-all: %v", err)
 		os.Exit(1)
@@ -111,7 +111,7 @@ func (m *model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.demos[m.current], cmd = m.demos[m.current].Update(m.demoSize())
 		return m, cmd
 
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
@@ -154,7 +154,7 @@ func (m *model) updateSplash(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		return m, nil
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "q", "ctrl+c":
 			return m, tea.Quit
@@ -212,7 +212,14 @@ func (m *model) viewSplash() string {
 	return lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, box)
 }
 
-func (m *model) View() string {
+func (m *model) View() tea.View {
+	view := tea.NewView(m.render())
+	view.AltScreen = true
+	return view
+}
+
+// render returns the splash screen, or the header line and the current demo under it.
+func (m *model) render() string {
 	if !m.started {
 		return m.viewSplash()
 	}
@@ -223,5 +230,5 @@ func (m *model) View() string {
 		text = ansi.Truncate(text, m.width, "…")
 	}
 	header := headerStyle.Width(m.width).Align(lipgloss.Center).Render(text)
-	return header + "\n" + m.demos[m.current].View()
+	return header + "\n" + m.demos[m.current].View().Content
 }

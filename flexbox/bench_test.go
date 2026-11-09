@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // benchBox builds a full-screen dashboard: a fixed header, three ratio rows of bordered

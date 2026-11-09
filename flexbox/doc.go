@@ -54,9 +54,7 @@
 // Render lays out the grid every time and renders again only what changed since the
 // last call: a cell when its size, style or content changed, a row or column when one
 // of its cells did, the box when one of its rows or columns did. A content generator
-// runs on every render, so content that reads outside state is always current. Text
-// styled by an earlier render is reused as it is: after changing how lipgloss renders a
-// style at run time, such as the color profile, set the styles again.
+// runs on every render, so content that reads outside state is always current.
 //
 // # Styles
 //

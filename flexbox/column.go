@@ -1,6 +1,6 @@
 package flexbox
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // Column holds the cells of one column of a HorizontalFlexBox. Its width comes from the
 // box; its cells' widths and heights come from their ratios and fixed sizes. Columns sit
@@ -181,10 +181,7 @@ func (c *Column) render(from inherited) *block {
 	group := widest(c.parts)
 	c.out.stack(c.parts, group, group, lipgloss.Left, height)
 	f := c.style.frame
-	style := c.style.effective.
-		Width(key.width - f.edgeX).MaxWidth(key.width).
-		Height(key.height - f.edgeY())
-	text := renderStyled(style, c.out.String())
+	text := renderStyled(f.sized(c.style.effective, key.width, key.height), c.out.String())
 	c.out.fill(text, key.width, key.height, f.top, f.bottom)
 	return &c.out
 }

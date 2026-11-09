@@ -6,9 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
-	"github.com/muesli/termenv"
 )
 
 // The reference renderers below compose a grid from scratch with lipgloss joins and
@@ -35,8 +34,7 @@ func referenceFlexBox(box *FlexBox) string {
 		}
 		width := row.width - style.GetHorizontalFrameSize()
 		joined := referenceClip(lipgloss.JoinHorizontal(lipgloss.Top, cells...), width)
-		edgeY := style.GetVerticalBorderSize() + style.GetVerticalMargins()
-		rows = append(rows, style.Height(row.height-edgeY).MaxHeight(row.height).Render(joined))
+		rows = append(rows, style.Height(row.height-style.GetVerticalMargins()).MaxHeight(row.height).Render(joined))
 	}
 	return referenceFrame(box.style.own, box.width, box.height, lipgloss.JoinVertical(box.rowAlign, rows...))
 }
@@ -63,13 +61,12 @@ func referenceHorizontal(box *HorizontalFlexBox) string {
 	return referenceFrame(box.style.own, box.width, box.height, placed)
 }
 
-// referenceFrame renders content inside style at width by height.
+// referenceFrame renders content inside style at width by height. A lipgloss width and
+// height count the border and the padding in and leave the margins out.
 func referenceFrame(style lipgloss.Style, width, height int, content string) string {
-	edgeX := style.GetHorizontalBorderSize() + style.GetHorizontalMargins()
-	edgeY := style.GetVerticalBorderSize() + style.GetVerticalMargins()
 	return renderStyled(style.
-		Width(width-edgeX).MaxWidth(width).
-		Height(height-edgeY).MaxHeight(height), content)
+		Width(width-style.GetHorizontalMargins()).MaxWidth(width).
+		Height(height-style.GetVerticalMargins()).MaxHeight(height), content)
 }
 
 // referenceCell renders cell with lipgloss alone.
@@ -93,7 +90,9 @@ func referenceCell(cell *Cell, parent lipgloss.Style, passing bool) string {
 		content = cell.contentGenerator(max(width, 0), max(height, 0))
 	}
 	fitted := fitContent(content, width-style.GetHorizontalPadding(), height-style.GetVerticalPadding())
-	rendered := renderStyled(style.Width(width).MaxWidth(cell.width).Height(height), fitted)
+	rendered := renderStyled(style.
+		Width(cell.width-style.GetHorizontalMargins()).MaxWidth(cell.width).
+		Height(cell.height-style.GetVerticalMargins()), fitted)
 	lines := trimInside(strings.Split(rendered, "\n"), cell.height, top, bottom)
 	// lipgloss leaves a line short when a wide character does not fit before the cut;
 	// a cell is always its full width
@@ -178,13 +177,6 @@ func mutateCell(rng *rand.Rand, cell *Cell, alongFixed func(int) *Cell, alongMin
 	}
 }
 
-func useTrueColor(t *testing.T) {
-	t.Helper()
-	profile := lipgloss.ColorProfile()
-	lipgloss.SetColorProfile(termenv.TrueColor)
-	t.Cleanup(func() { lipgloss.SetColorProfile(profile) })
-}
-
 func assertSameRender(t *testing.T, step string, got, want string) {
 	t.Helper()
 	if got == want {
@@ -200,7 +192,6 @@ func assertSameRender(t *testing.T, step string, got, want string) {
 }
 
 func TestFlexBoxRendersLikeLipglossComposition(t *testing.T) {
-	useTrueColor(t)
 	for seed := int64(0); seed < 80; seed++ {
 		rng := rand.New(rand.NewSource(seed))
 		box := New(40+rng.Intn(80), 30+rng.Intn(20)).SetRowAlign(pick(rng, referenceAligns))
@@ -244,7 +235,6 @@ func TestFlexBoxRendersLikeLipglossComposition(t *testing.T) {
 }
 
 func TestHorizontalFlexBoxRendersLikeLipglossComposition(t *testing.T) {
-	useTrueColor(t)
 	for seed := int64(0); seed < 80; seed++ {
 		rng := rand.New(rand.NewSource(seed))
 		box := NewHorizontal(60+rng.Intn(60), 30+rng.Intn(20)).SetColumnAlign(pick(rng, referenceAligns))

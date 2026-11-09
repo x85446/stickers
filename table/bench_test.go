@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/x85446/stickers/flexbox"
+	"github.com/x85446/stickers/v2/flexbox"
 )
 
 // benchTable builds a table of n rows with an int, a string and a float column.

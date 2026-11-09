@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/x85446/stickers/flexbox"
+	"charm.land/lipgloss/v2"
+	"github.com/x85446/stickers/v2/flexbox"
 )
 
 var border = lipgloss.NewStyle().Border(lipgloss.NormalBorder())

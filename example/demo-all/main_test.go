@@ -5,10 +5,17 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
-func key(k tea.KeyType) tea.KeyMsg { return tea.KeyMsg{Type: k} }
+// The keys the tests press.
+var (
+	keySpace    = tea.KeyPressMsg{Code: tea.KeySpace, Text: " "}
+	keyTab      = tea.KeyPressMsg{Code: tea.KeyTab}
+	keyShiftTab = tea.KeyPressMsg{Code: tea.KeyTab, Mod: tea.ModShift}
+	keyQ        = tea.KeyPressMsg{Code: 'q', Text: "q"}
+	keyCtrlC    = tea.KeyPressMsg{Code: 'c', Mod: tea.ModCtrl}
+)
 
 func press(t *testing.T, m *model, msg tea.Msg) *model {
 	t.Helper()
@@ -27,27 +34,27 @@ func TestSplashThenCycle(t *testing.T) {
 	m := newModel()
 	m = press(t, m, tea.WindowSizeMsg{Width: 80, Height: 24})
 
-	if v := m.View(); !strings.Contains(v, "press any key to start") {
+	if v := m.View().Content; !strings.Contains(v, "press any key to start") {
 		t.Fatalf("splash missing start hint:\n%s", v)
 	}
 
-	m = press(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	m = press(t, m, keySpace)
 	if !m.started {
 		t.Fatal("space did not leave the splash screen")
 	}
-	if v := m.View(); !strings.Contains(v, demoInfos[0].name) {
+	if v := m.View().Content; !strings.Contains(v, demoInfos[0].name) {
 		t.Fatalf("first demo header missing:\n%s", v)
 	}
 
 	for i := 0; i < len(m.demos); i++ {
-		m = press(t, m, key(tea.KeyShiftTab))
+		m = press(t, m, keyShiftTab)
 		m.View()
 	}
 	if m.current != 0 {
 		t.Fatalf("shift+tab x%d ended on %d, want 0", len(m.demos), m.current)
 	}
 	for i := 0; i < len(m.demos); i++ {
-		m = press(t, m, key(tea.KeyTab))
+		m = press(t, m, keyTab)
 		m.View()
 	}
 	if m.current != 0 {
@@ -57,10 +64,7 @@ func TestSplashThenCycle(t *testing.T) {
 
 // TestSplashQuit checks q and ctrl+c quit from the splash screen.
 func TestSplashQuit(t *testing.T) {
-	for _, k := range []tea.KeyMsg{
-		{Type: tea.KeyRunes, Runes: []rune{'q'}},
-		{Type: tea.KeyCtrlC},
-	} {
+	for _, k := range []tea.KeyPressMsg{keyQ, keyCtrlC} {
 		m := newModel()
 		_, cmd := m.Update(k)
 		if cmd == nil {
@@ -81,11 +85,11 @@ func TestEveryDemoFitsUnderHeader(t *testing.T) {
 	for _, size := range [][2]int{{80, 24}, {120, 40}, {160, 40}} {
 		m := newModel()
 		m = press(t, m, tea.WindowSizeMsg{Width: size[0], Height: size[1]})
-		m = press(t, m, tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+		m = press(t, m, keySpace)
 		for i := range m.demos {
 			checkFits(t, m, size[0], size[1])
 			if i < len(m.demos)-1 {
-				m = press(t, m, key(tea.KeyTab))
+				m = press(t, m, keyTab)
 			}
 		}
 		m = press(t, m, tea.WindowSizeMsg{Width: size[0] - 10, Height: size[1] - 4})
@@ -96,7 +100,7 @@ func TestEveryDemoFitsUnderHeader(t *testing.T) {
 func checkFits(t *testing.T, m *model, width, height int) {
 	t.Helper()
 	info := demoInfos[m.current]
-	lines := strings.Split(m.View(), "\n")
+	lines := strings.Split(m.View().Content, "\n")
 	if len(lines) > height {
 		t.Errorf("%s at %dx%d renders %d lines", info.name, width, height, len(lines))
 	}

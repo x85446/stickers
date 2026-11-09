@@ -1,6 +1,6 @@
 package table
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // StyleKey names a part of the table whose style SetStyles can override.
 type StyleKey int

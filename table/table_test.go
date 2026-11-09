@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 var ansiRe = regexp.MustCompile(`\x1b\[[0-9;?]*[a-zA-Z]`)

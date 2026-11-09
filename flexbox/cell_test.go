@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 func bordered() lipgloss.Style { return lipgloss.NewStyle().Border(lipgloss.NormalBorder()) }
@@ -184,12 +184,14 @@ func plainAndStyled(t *testing.T, content string, width, height int) []string {
 	return plain
 }
 
-// TestCellWrapsLikeLipgloss: a cell breaks its content where lipgloss breaks it, with
-// and without a style, and loses no character at a break.
-func TestCellWrapsLikeLipgloss(t *testing.T) {
+// TestCellWrapsWithoutLosingContent: a cell breaks its content at words, breaks a word
+// that is too long, keeps a character with its combining marks, and shows the same
+// lines with and without a style.
+func TestCellWrapsWithoutLosingContent(t *testing.T) {
 	assertLines(t, plainAndStyled(t, " Configuration", 8, 3), "        ", "Configur", "ation   ")
 	assertLines(t, plainAndStyled(t, "山田太郎-san", 8, 3), "山田太郎", "-san    ", "        ")
 	assertLines(t, plainAndStyled(t, "cafe\u0301s", 4, 2), "cafe\u0301", "s   ")
+	assertLines(t, plainAndStyled(t, "a-very-long-word", 6, 3), "a-    ", "very-l", "ong-  ")
 	assertLines(t, plainAndStyled(t, "abc\r\ndef", 10, 1), "abc       ")
 	assertLines(t, plainAndStyled(t, "abc\r\ndef", 10, 2), "abc       ", "def       ")
 	assertLines(t, plainAndStyled(t, "a\tb", 8, 1), "a    b  ")
@@ -207,9 +209,9 @@ func TestCellWrapsLikeLipgloss(t *testing.T) {
 	}
 }
 
-// TestFitContentBreaksWhereLipglossBreaks pins the wrap a cell counts its lines with to
-// the wrap inside lipgloss: both must break every content at the same places.
-func TestFitContentBreaksWhereLipglossBreaks(t *testing.T) {
+// TestLipglossKeepsFittedContent: the wrap inside lipgloss must leave content that
+// fitContent prepared as it is, so a cell shows the lines it counted.
+func TestLipglossKeepsFittedContent(t *testing.T) {
 	trimmed := func(text string) string {
 		lines := strings.Split(text, "\n")
 		for i, line := range lines {
@@ -219,12 +221,17 @@ func TestFitContentBreaksWhereLipglossBreaks(t *testing.T) {
 	}
 	for _, content := range []string{
 		" Configuration", "山田太郎-san", "cafe\u0301s", "one two three four", "a-b-c-d-e-f-g", "longwordwithoutanybreak",
-		"  two leading", "x  y  z", "日本語 text 日本語", "👾👾👾👾",
+		"  two leading", "x  y  z", "日本語 text 日本語", "👾👾👾👾", "tab\there and\tthere", "a-very-long-hyphenated-word",
 	} {
 		for width := 1; width <= 10; width++ {
-			want := trimmed(lipgloss.NewStyle().Width(width).Render(content))
-			if got := trimmed(fitContent(content, width, 99)); got != want {
-				t.Errorf("content %q at width %d breaks as\n%q\nlipgloss breaks it as\n%q", content, width, got, want)
+			fitted := fitContent(content, width, 99)
+			for _, line := range strings.Split(fitted, "\n") {
+				if w := lipgloss.Width(line); w > width {
+					t.Errorf("content %q at width %d has the line %q of %d columns", content, width, line, w)
+				}
+			}
+			if got := trimmed(lipgloss.Wrap(fitted, width, "")); got != trimmed(fitted) {
+				t.Errorf("content %q at width %d is fitted as\n%q\nand lipgloss breaks that again as\n%q", content, width, fitted, got)
 			}
 		}
 	}
@@ -233,7 +240,6 @@ func TestFitContentBreaksWhereLipglossBreaks(t *testing.T) {
 // TestStyledContentInAPlainCellStaysInTheCell: escape sequences in the content are
 // closed at every line end, so a color never runs into the next cell.
 func TestStyledContentInAPlainCellStaysInTheCell(t *testing.T) {
-	useTrueColor(t)
 	red := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff0000")).Render("long red text that wraps")
 	box := New(20, 3)
 	box.AddRows([]*Row{box.NewRow().AddCells(NewCell(1, 1).SetContent(red), NewCell(1, 1).SetContent("plain"))})

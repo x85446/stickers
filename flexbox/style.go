@@ -4,7 +4,7 @@ import (
 	"strings"
 	"sync/atomic"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 // keeper marks the end of a text whose trailing spaces a style must keep: a zero-width
@@ -54,12 +54,24 @@ type inherited struct {
 type frame struct {
 	top, bottom int // margin plus border above and below the content
 	edgeX       int // margin plus border, left and right together
+	marginX     int // left and right margin together
+	marginY     int // top and bottom margin together
 	paddingX    int // left and right padding together
 	paddingY    int // top and bottom padding together
 }
 
 // edgeY returns the lines the margins and border take, above and below together.
 func (f frame) edgeY() int { return f.top + f.bottom }
+
+// sized returns style set to render at exactly width by height, margins included.
+// Lipgloss counts the border and the padding into a style's width and height and adds
+// the margins outside, so the margins are taken off first. A width of 0 or less leaves
+// the width to the content.
+func (f frame) sized(style lipgloss.Style, width, height int) lipgloss.Style {
+	return style.
+		Width(width - f.marginX).MaxWidth(width).
+		Height(height - f.marginY)
+}
 
 // styling is the style of a box, row, column or cell: the style set on it and the
 // effective style it renders with, which adds what its parent passes.
@@ -101,6 +113,8 @@ func (s *styling) resolve(from inherited) {
 			top:      s.effective.GetMarginTop() + s.effective.GetBorderTopSize(),
 			bottom:   s.effective.GetBorderBottomSize() + s.effective.GetMarginBottom(),
 			edgeX:    s.effective.GetHorizontalMargins() + s.effective.GetHorizontalBorderSize(),
+			marginX:  s.effective.GetHorizontalMargins(),
+			marginY:  s.effective.GetVerticalMargins(),
 			paddingX: s.effective.GetHorizontalPadding(),
 			paddingY: s.effective.GetVerticalPadding(),
 		}

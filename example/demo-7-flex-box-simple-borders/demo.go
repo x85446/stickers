@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/x85446/stickers/flexbox"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/x85446/stickers/v2/flexbox"
 )
 
 var (
@@ -146,7 +146,7 @@ func cellContent(label string, ratioX, ratioY, w, h int) string {
 // Run starts the demo as a standalone program
 func Run() {
 	m := New()
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
@@ -164,7 +164,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = msg.Height
 		m.flexBox.SetWidth(msg.Width)
 		m.flexBox.SetHeight(msg.Height)
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -212,13 +212,18 @@ var aboutStyle = lipgloss.NewStyle().
 	Background(lipgloss.Color("#1a1a2e"))
 
 // View implements tea.Model
-func (m *Model) View() string {
+func (m *Model) View() tea.View {
+	view := tea.NewView(m.render())
+	view.AltScreen = true
+	return view
+}
+
+// render returns the demo as text.
+func (m *Model) render() string {
 	content := m.flexBox.Render()
 	if m.showAbout {
 		overlay := aboutStyle.Render(aboutText)
-		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay,
-			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay)
 	}
 	return content
 }

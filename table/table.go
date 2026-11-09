@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"slices"
 
-	"github.com/charmbracelet/lipgloss"
-	"github.com/x85446/stickers/flexbox"
+	"charm.land/lipgloss/v2"
+	"github.com/x85446/stickers/v2/flexbox"
 )
 
 // Table is a responsive table with a one-line header, one-line rows and a one-line
@@ -244,9 +244,6 @@ func (t *Table) ClearRows() *Table {
 // the header, the visible rows and a footer that reads "x:y / w:h", the cursor position
 // and the size of the rows area, prefixed by the filter when the cursor is on the
 // filtered column. Only what changed since the last render is rendered again.
-//
-// Text styled by an earlier render is reused as it is. After changing how lipgloss
-// renders a style at run time, such as the color profile, call SetStyles again.
 func (t *Table) Render() string {
 	if t.height <= 0 {
 		return ""

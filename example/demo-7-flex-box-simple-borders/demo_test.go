@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // bottomRow renders the demo at 70x23 with the given border index and returns the last
@@ -15,7 +15,7 @@ func bottomRow(t *testing.T, borderType int) string {
 	m.borderType = borderType
 	m.updateStyles()
 	m.Update(tea.WindowSizeMsg{Width: 70, Height: 23})
-	lines := strings.Split(m.View(), "\n")
+	lines := strings.Split(m.View().Content, "\n")
 	if len(lines) != 23 {
 		t.Fatalf("rendered %d lines, want 23", len(lines))
 	}

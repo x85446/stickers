@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	tea "github.com/charmbracelet/bubbletea"
+	tea "charm.land/bubbletea/v2"
 )
 
 // TestDynamicModeKeepsHeaderRow: with nothing fixed, row 1 shares the height like the
@@ -12,9 +12,9 @@ import (
 func TestDynamicModeKeepsHeaderRow(t *testing.T) {
 	m := New()
 	m.Update(tea.WindowSizeMsg{Width: 127, Height: 22})
-	m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'m'}})
+	m.Update(tea.KeyPressMsg{Code: 'm', Text: "m"})
 
-	lines := strings.Split(m.View(), "\n")
+	lines := strings.Split(m.View().Content, "\n")
 	if len(lines) != 22 {
 		t.Fatalf("rendered %d lines, want 22", len(lines))
 	}

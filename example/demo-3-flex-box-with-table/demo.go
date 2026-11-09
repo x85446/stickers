@@ -11,11 +11,11 @@ import (
 	"strings"
 	"unicode"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"github.com/x85446/stickers/example/sample"
-	"github.com/x85446/stickers/flexbox"
-	"github.com/x85446/stickers/table"
+	"github.com/x85446/stickers/v2/flexbox"
+	"github.com/x85446/stickers/v2/table"
 )
 
 var (
@@ -117,7 +117,7 @@ func New() *Model {
 // Run starts the demo as a standalone program
 func Run() {
 	m := New()
-	p := tea.NewProgram(m, tea.WithAltScreen())
+	p := tea.NewProgram(m)
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
@@ -137,7 +137,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = windowHeight
 		m.flexBox.SetWidth(windowWidth)
 		m.flexBox.SetHeight(windowHeight)
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
 			return m, tea.Quit
@@ -161,7 +161,7 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			case table.SortingOrderDescending:
 				m.table.OrderByAsc(x)
 			}
-		case "enter", " ":
+		case "enter", "space":
 			cellString := m.table.GetCursorValue()
 			// add content to random boxes on flex box
 			for ir := 0; ir < m.flexBox.RowsLen(); ir++ {
@@ -183,11 +183,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "backspace":
 			m.filterWithStr(msg.String())
 		default:
-			if len(msg.String()) == 1 {
-				r := msg.Runes[0]
-				if unicode.IsLetter(r) || unicode.IsDigit(r) {
-					m.filterWithStr(msg.String())
-				}
+			if r := []rune(msg.Text); len(r) == 1 && (unicode.IsLetter(r[0]) || unicode.IsDigit(r[0])) {
+				m.filterWithStr(msg.Text)
 			}
 		}
 
@@ -219,13 +216,18 @@ var aboutStyle = lipgloss.NewStyle().
 	Background(lipgloss.Color("#1a1a2e"))
 
 // View implements tea.Model
-func (m *Model) View() string {
+func (m *Model) View() tea.View {
+	view := tea.NewView(m.render())
+	view.AltScreen = true
+	return view
+}
+
+// render returns the demo as text.
+func (m *Model) render() string {
 	content := m.flexBox.Render()
 	if m.showAbout {
 		overlay := aboutStyle.Render(aboutText)
-		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay,
-			lipgloss.WithWhitespaceChars(" "),
-			lipgloss.WithWhitespaceForeground(lipgloss.Color("#1a1a2e")))
+		content = lipgloss.Place(m.width, m.height, lipgloss.Center, lipgloss.Center, overlay)
 	}
 	return content
 }

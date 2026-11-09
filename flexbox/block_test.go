@@ -4,7 +4,7 @@ import (
 	"slices"
 	"testing"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
 )
 
 const red = "\x1b[31m"

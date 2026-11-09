@@ -1,6 +1,6 @@
 package flexbox
 
-import "github.com/charmbracelet/lipgloss"
+import "charm.land/lipgloss/v2"
 
 // Row holds the cells of one row of a FlexBox. Its height comes from the box; its cells'
 // widths and heights come from their ratios and fixed sizes. Rows stack vertically.
@@ -181,7 +181,7 @@ func (r *Row) render(from inherited) *block {
 			content = spaces(r.out.width)
 		}
 		f := r.style.frame
-		text := r.style.effective.Height(key.height - f.edgeY()).Render(content)
+		text := r.style.effective.Height(key.height - f.marginY).Render(content)
 		r.out.fill(text, textWidth(text), key.height, f.top, f.bottom)
 	}
 	return &r.out

@@ -4,7 +4,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/charmbracelet/x/cellbuf"
 )
 
@@ -80,7 +81,7 @@ func (c *Cell) GetID() string {
 }
 
 // SetContent sets static content. The cell wraps it at its content width and clips it
-// to its content height when it renders.
+// to its content height when it renders. A tab shows as four spaces.
 func (c *Cell) SetContent(content string) *Cell {
 	c.contentGenerator = func(_, _ int) string {
 		return content
@@ -204,14 +205,11 @@ func (c *Cell) render(from inherited) *block {
 	case width == 0 || height == 0:
 		c.out.collapse(width, height)
 	case c.style.plain():
-		c.out.fill(wrapPlain(content, width, height), width, height, 0, 0)
+		c.out.fill(fitPlain(content, width, height), width, height, 0, 0)
 	default:
 		f := c.style.frame
-		contentWidth, contentHeight := width-f.edgeX, height-f.edgeY()
-		style := c.style.effective.
-			Width(contentWidth).MaxWidth(width).
-			Height(contentHeight)
-		text := renderStyled(style, fitContent(content, contentWidth-f.paddingX, contentHeight-f.paddingY))
+		fitted := fitContent(content, width-f.edgeX-f.paddingX, height-f.edgeY()-f.paddingY)
+		text := renderStyled(f.sized(c.style.effective, width, height), fitted)
 		c.out.fill(text, width, height, f.top, f.bottom)
 	}
 	return &c.out
@@ -256,40 +254,55 @@ func copyCells(cells []*Cell) []*Cell {
 	return copies
 }
 
-// fitContent wraps content at width, the width lipgloss wraps it at, and keeps the
-// first height lines.
+// fitContent prepares content for a cell: it wraps the content at width and keeps the
+// first height lines. Tabs become four spaces and Windows line ends plain ones.
+//
+// Lipgloss wraps what it renders once more, at the same width. Content prepared here
+// already fits, so that second wrap changes nothing; left to itself it breaks some lines
+// too late and loses what sticks out past the cell.
 func fitContent(content string, width, height int) string {
 	if width <= 0 || height <= 0 {
 		return ""
 	}
-	if strings.Contains(content, "\r\n") {
+	if strings.ContainsAny(content, "\t\r") {
 		content = strings.ReplaceAll(content, "\r\n", "\n")
+		content = strings.ReplaceAll(content, "\t", "    ")
 	}
 	// the wrap drops the spaces at the very end of its input; a newline after the
 	// last line keeps them
-	wrapped := strings.TrimSuffix(wrap(content+"\n", width), "\n")
-	return firstLines(wrapped, height)
+	wrapped := strings.TrimSuffix(cellbuf.Wrap(content+"\n", width, ""), "\n")
+	return cutLines(firstLines(wrapped, height), width)
 }
 
-// wrapPlain prepares content for a cell with the empty style the way fitContent and
-// lipgloss prepare it for a styled one: it wraps at width, keeps the first height lines,
-// and turns tabs into four spaces.
-func wrapPlain(content string, width, height int) string {
+// cutLines cuts every line of text that is wider than width, which a wrap leaves when
+// a single character is: a wide character in a cell of one column.
+func cutLines(text string, width int) string {
+	fitting := true
+	for line := range strings.SplitSeq(text, "\n") {
+		if lineWidth(line) > width {
+			fitting = false
+			break
+		}
+	}
+	if fitting {
+		return text
+	}
+	lines := strings.Split(text, "\n")
+	for i, line := range lines {
+		if lineWidth(line) > width {
+			lines[i] = ansi.Truncate(line, width, "")
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// fitPlain is fitContent for a cell with the empty style. Content that fits as it is
+// skips the wrap.
+func fitPlain(content string, width, height int) string {
 	if fits(content, width) {
 		return content
 	}
-	text := fitContent(content, width, height)
-	if strings.Contains(text, "\t") {
-		text = strings.ReplaceAll(text, "\t", "    ")
-	}
-	return wrap(text, width)
-}
-
-// wrap wraps text at width with the function lipgloss wraps with, so a cell counts the
-// same lines lipgloss renders. It breaks at words, breaks a word that is too long, and
-// closes and reopens escape sequences around every break.
-func wrap(text string, width int) string {
-	return cellbuf.Wrap(text, width, "")
+	return fitContent(content, width, height)
 }
 
 // fits reports whether every line of text is printable ASCII and at most width columns
