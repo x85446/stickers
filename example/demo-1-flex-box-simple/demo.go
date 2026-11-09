@@ -1,12 +1,13 @@
+// Package demo1 is the FlexBox Simple demo: a grid of colored cells sized by ratios.
 package demo1
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/x85446/stickers/flexbox"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/flexbox"
 )
 
 var (
@@ -106,7 +107,7 @@ func New() *Model {
 func Run() {
 	m := New()
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}

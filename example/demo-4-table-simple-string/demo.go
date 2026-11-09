@@ -1,16 +1,19 @@
+// Package demo4 is the Table Simple String demo: a Table of string columns with sorting and filtering.
 package demo4
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"log"
 	"os"
 	"unicode"
 
-	"github.com/x85446/stickers/flexbox"
-	"github.com/x85446/stickers/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/example/sample"
+	"github.com/x85446/stickers/flexbox"
+	"github.com/x85446/stickers/table"
 )
 
 var selectedValue string = "\nselect something with spacebar or enter"
@@ -43,21 +46,7 @@ Press 'a' to close | 'q' to quit`
 
 // New creates a new demo 4 model
 func New() *Model {
-	// read in CSV data - try multiple paths for flexibility
-	csvPath := "../sample.csv"
-	f, err := os.Open(csvPath)
-	if err != nil {
-		// Try path from example/ directory (for demo-all)
-		csvPath = "sample.csv"
-		f, err = os.Open(csvPath)
-		if err != nil {
-			panic(err)
-		}
-	}
-	defer f.Close()
-
-	csvReader := csv.NewReader(f)
-	data, err := csvReader.ReadAll()
+	data, err := csv.NewReader(bytes.NewReader(sample.CSV)).ReadAll()
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -113,7 +102,7 @@ ctrl+c: quit
 func Run() {
 	m := New()
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
@@ -173,26 +162,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// filterWithStr edits the filter of the cursor's column: a letter or digit extends it and
+// backspace removes its last character.
 func (m *Model) filterWithStr(key string) {
-	i, s := m.table.GetFilter()
+	column, filter := m.table.GetFilter()
 	x, _ := m.table.GetCursorLocation()
-	if x != i && key != "backspace" {
+	switch {
+	case key != "backspace" && x != column:
 		m.table.SetFilter(x, key)
-		return
+	case key != "backspace":
+		m.table.SetFilter(column, filter+key)
+	case len(filter) > 1:
+		m.table.SetFilter(column, filter[:len(filter)-1])
+	case len(filter) == 1:
+		m.table.UnsetFilter()
 	}
-	if key == "backspace" {
-		if len(s) == 1 {
-			m.table.UnsetFilter()
-			return
-		} else if len(s) > 1 {
-			s = s[0 : len(s)-1]
-		} else {
-			return
-		}
-	} else {
-		s = s + key
-	}
-	m.table.SetFilter(i, s)
 }
 
 var aboutStyle = lipgloss.NewStyle().

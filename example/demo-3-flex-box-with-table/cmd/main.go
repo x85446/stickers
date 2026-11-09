@@ -1,3 +1,4 @@
+// Command cmd runs the FlexBox with Table demo.
 package main
 
 import demo3 "github.com/x85446/stickers/example/demo-3-flex-box-with-table"

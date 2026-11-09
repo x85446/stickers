@@ -1,3 +1,5 @@
+// Command demo-all runs every demo in one program and cycles through them with tab and
+// shift+tab.
 package main
 
 import (
@@ -11,7 +13,7 @@ import (
 	demo10 "github.com/x85446/stickers/example/demo-10-flex-box-mixed-fixed"
 	demo11 "github.com/x85446/stickers/example/demo-11-flex-box-cell-config"
 	demo12 "github.com/x85446/stickers/example/demo-12-flex-box-row-align"
-	demo2 "github.com/x85446/stickers/example/demo-2-flex-box-horizonal"
+	demo2 "github.com/x85446/stickers/example/demo-2-flex-box-horizontal"
 	demo3 "github.com/x85446/stickers/example/demo-3-flex-box-with-table"
 	demo4 "github.com/x85446/stickers/example/demo-4-table-simple-string"
 	demo5 "github.com/x85446/stickers/example/demo-5-table-multi-type"

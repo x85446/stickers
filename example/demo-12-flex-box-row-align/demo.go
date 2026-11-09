@@ -1,12 +1,13 @@
+// Package demo12 is the Row Alignment demo: rows narrower than the box placed left, center or right.
 package demo12
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/x85446/stickers/flexbox"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/flexbox"
 )
 
 var (
@@ -64,7 +65,7 @@ func New() *Model {
 func Run() {
 	m := New()
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}

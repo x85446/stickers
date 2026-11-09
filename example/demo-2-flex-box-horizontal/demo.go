@@ -1,35 +1,22 @@
+// Package demo2 is the FlexBox Horizontal demo: columns of cells in a HorizontalFlexBox.
 package demo2
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/x85446/stickers/flexbox"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/flexbox"
 )
 
 var (
-	style1  = lipgloss.NewStyle().Background(lipgloss.Color("#fc5c65"))
-	style2  = lipgloss.NewStyle().Background(lipgloss.Color("#fd9644"))
-	style3  = lipgloss.NewStyle().Background(lipgloss.Color("#fed330"))
-	style4  = lipgloss.NewStyle().Background(lipgloss.Color("#26de81"))
-	style5  = lipgloss.NewStyle().Background(lipgloss.Color("#2bcbba"))
-	style6  = lipgloss.NewStyle().Background(lipgloss.Color("#eb3b5a"))
-	style7  = lipgloss.NewStyle().Background(lipgloss.Color("#fa8231"))
-	style8  = lipgloss.NewStyle().Background(lipgloss.Color("#f7b731"))
-	style9  = lipgloss.NewStyle().Background(lipgloss.Color("#20bf6b"))
-	style10 = lipgloss.NewStyle().Background(lipgloss.Color("#0fb9b1"))
-	style11 = lipgloss.NewStyle().Background(lipgloss.Color("#45aaf2"))
-	style12 = lipgloss.NewStyle().Background(lipgloss.Color("#4b7bec"))
-	style13 = lipgloss.NewStyle().Background(lipgloss.Color("#a55eea"))
-	style14 = lipgloss.NewStyle().Background(lipgloss.Color("#d1d8e0"))
-	style15 = lipgloss.NewStyle().Background(lipgloss.Color("#778ca3"))
-	style16 = lipgloss.NewStyle().Background(lipgloss.Color("#2d98da"))
-	style17 = lipgloss.NewStyle().Background(lipgloss.Color("#3867d6"))
-	style18 = lipgloss.NewStyle().Background(lipgloss.Color("#8854d0"))
-	style19 = lipgloss.NewStyle().Background(lipgloss.Color("#a5b1c2"))
-	style20 = lipgloss.NewStyle().Background(lipgloss.Color("#4b6584"))
+	style1 = lipgloss.NewStyle().Background(lipgloss.Color("#fc5c65"))
+	style2 = lipgloss.NewStyle().Background(lipgloss.Color("#fd9644"))
+	style3 = lipgloss.NewStyle().Background(lipgloss.Color("#fed330"))
+	style4 = lipgloss.NewStyle().Background(lipgloss.Color("#26de81"))
+	style5 = lipgloss.NewStyle().Background(lipgloss.Color("#2bcbba"))
+	style6 = lipgloss.NewStyle().Background(lipgloss.Color("#eb3b5a"))
 )
 
 // Model is the Bubble Tea model for demo 2
@@ -89,7 +76,7 @@ func New() *Model {
 func Run() {
 	m := New()
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}

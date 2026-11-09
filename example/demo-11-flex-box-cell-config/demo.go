@@ -1,3 +1,4 @@
+// Package demo11 is the Cell Config demo: a grid whose cells' fixed sizes change at run time.
 package demo11
 
 import (
@@ -6,9 +7,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/x85446/stickers/flexbox"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/flexbox"
 )
 
 var (
@@ -38,28 +39,30 @@ type CellConfig struct {
 	RatioY         int
 }
 
+// ConfigMode is what the keyboard does at the moment.
 type ConfigMode int
 
+// The modes of the demo.
 const (
-	ModeNormal ConfigMode = iota
-	ModeConfiguring
-	ModeSettingValue
+	ModeNormal       ConfigMode = iota // keys toggle the border and the text and select a cell
+	ModeConfiguring                    // a cell is selected and keys pick the size to set
+	ModeSettingValue                   // digits type the value of the size
 )
 
 // Model is the Bubble Tea model for demo 11
 type Model struct {
-	flexBox        *flexbox.FlexBox
-	borderType     int               // 0=none, 1=normal, 2=rounded, 3=thick, 4=double
-	hideText       bool              // Toggle text visibility
-	cellConfigs    map[string]*CellConfig // Per-cell configuration
-	configMode     ConfigMode        // Current configuration mode
-	selectedCell   string            // Currently selected cell (C-W, skip H)
-	settingType    string            // What we're setting (width, height, ratioX, ratioY)
-	inputBuffer    string            // Buffer for numeric input
-	firstInput     bool              // True if we haven't typed yet in value mode
-	termWidth      int
-	termHeight     int
-	showAbout      bool
+	flexBox      *flexbox.FlexBox
+	borderType   int                    // 0=none, 1=normal, 2=rounded, 3=thick, 4=double
+	hideText     bool                   // Toggle text visibility
+	cellConfigs  map[string]*CellConfig // Per-cell configuration
+	configMode   ConfigMode             // Current configuration mode
+	selectedCell string                 // Currently selected cell (C-W, skip H)
+	settingType  string                 // What we're setting (width, height, ratioX, ratioY)
+	inputBuffer  string                 // Buffer for numeric input
+	firstInput   bool                   // True if we haven't typed yet in value mode
+	termWidth    int
+	termHeight   int
+	showAbout    bool
 }
 
 const aboutText = `Demo 11: Per-Cell Configuration
@@ -109,7 +112,7 @@ func New() *Model {
 func Run() {
 	m := New()
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
@@ -350,11 +353,12 @@ func (m *Model) createCell(label string, colorIndex int) *flexbox.Cell {
 		}
 
 		// Build content based on mode
-		if m.configMode == ModeConfiguring && m.selectedCell == label {
+		switch {
+		case m.configMode == ModeConfiguring && m.selectedCell == label:
 			return m.renderConfigMenu(w, h)
-		} else if m.configMode == ModeSettingValue && m.selectedCell == label {
+		case m.configMode == ModeSettingValue && m.selectedCell == label:
 			return m.renderValueInput(w, h)
-		} else {
+		default:
 			return m.renderCellInfo(label, w, h)
 		}
 	})

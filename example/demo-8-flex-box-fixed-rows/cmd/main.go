@@ -1,3 +1,4 @@
+// Command cmd runs the Fixed Row Heights demo.
 package main
 
 import demo8 "github.com/x85446/stickers/example/demo-8-flex-box-fixed-rows"

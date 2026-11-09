@@ -1,3 +1,4 @@
+// Command cmd runs the Nested Borders demo.
 package main
 
 import demo6 "github.com/x85446/stickers/example/demo-6-flex-box-nested-borders"

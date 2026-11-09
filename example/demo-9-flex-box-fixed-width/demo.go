@@ -1,12 +1,13 @@
+// Package demo9 is the Fixed Column Widths demo: cells of a fixed width next to cells sized by ratio.
 package demo9
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/x85446/stickers/flexbox"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/flexbox"
 )
 
 // Model is the Bubble Tea model for demo 9
@@ -47,7 +48,7 @@ func New() *Model {
 func Run() {
 	m := New()
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}

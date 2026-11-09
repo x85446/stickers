@@ -1,3 +1,4 @@
+// Package demo7 is the Simple Borders demo: labeled cells in every border style.
 package demo7
 
 import (
@@ -146,7 +147,7 @@ func cellContent(label string, ratioX, ratioY, w, h int) string {
 func Run() {
 	m := New()
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}

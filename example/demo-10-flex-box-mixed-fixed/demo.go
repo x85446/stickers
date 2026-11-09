@@ -1,12 +1,13 @@
+// Package demo10 is the Mixed Fixed/Dynamic demo: fixed and ratio sizing in one grid.
 package demo10
 
 import (
 	"fmt"
 	"os"
 
-	"github.com/x85446/stickers/flexbox"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/flexbox"
 )
 
 var (
@@ -73,7 +74,7 @@ func New() *Model {
 func Run() {
 	m := New()
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
@@ -189,13 +190,13 @@ func (m *Model) rebuildFlexBox() {
 		fixedWidth int
 		label      string
 	}{
-		{2, 15, "Nav"},      // Fixed narrow nav
-		{2, 0, "Col1"},      // Dynamic
-		{3, 0, "Main"},      // Dynamic main area
-		{3, 0, "Col2"},      // Dynamic
-		{3, 0, "Col3"},      // Dynamic
-		{4, 0, "Content"},   // Dynamic
-		{4, 30, "Details"},  // Fixed details panel
+		{2, 15, "Nav"},     // Fixed narrow nav
+		{2, 0, "Col1"},     // Dynamic
+		{3, 0, "Main"},     // Dynamic main area
+		{3, 0, "Col2"},     // Dynamic
+		{3, 0, "Col3"},     // Dynamic
+		{4, 0, "Content"},  // Dynamic
+		{4, 30, "Details"}, // Fixed details panel
 	}
 
 	for i, c := range cells {
@@ -318,7 +319,7 @@ func (m *Model) rebuildFlexBox() {
 	// Five cells with varying ratios
 	for i := 0; i < 5; i++ {
 		ratios := []int{1, 1, 1, 1, 1}
-		fixedWidths := []int{12, 0, 0, 0, 12}  // First and last fixed
+		fixedWidths := []int{12, 0, 0, 0, 12} // First and last fixed
 
 		cell := flexbox.NewCell(ratios[i], 4).SetStyle(m.getCellStyle(15 + i))
 		if m.useFixed && fixedWidths[i] > 0 {

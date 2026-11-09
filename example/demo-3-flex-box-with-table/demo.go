@@ -1,6 +1,8 @@
+// Package demo3 is the FlexBox with Table demo: a Table inside a cell of a FlexBox, filled from CSV data.
 package demo3
 
 import (
+	"bytes"
 	"encoding/csv"
 	"fmt"
 	"math"
@@ -9,10 +11,11 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/x85446/stickers/flexbox"
-	"github.com/x85446/stickers/table"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/x85446/stickers/example/sample"
+	"github.com/x85446/stickers/flexbox"
+	"github.com/x85446/stickers/table"
 )
 
 var (
@@ -25,9 +28,6 @@ var (
 	style4          = lipgloss.NewStyle().Align(lipgloss.Center).Background(lipgloss.Color("#0abde3"))
 	style5          = lipgloss.NewStyle().Align(lipgloss.Center).Background(lipgloss.Color("#10ac84"))
 	style6          = lipgloss.NewStyle().Align(lipgloss.Center).Background(lipgloss.Color("#222f3e"))
-
-	tableRowIndex  = 1
-	tableCellIndex = 1
 )
 
 // Model is the Bubble Tea model for demo 3
@@ -45,7 +45,8 @@ const aboutText = `Demo 3: FlexBox with Table
 Embedded table inside a flexbox layout with CSV data.
 
 Shows how to nest a Table component inside a FlexBox cell.
-The table is placed in the center cell of row 2.
+The table is placed in the center cell of row 2: the cell's
+content generator sizes the table to the cell and renders it.
 
 Navigation:
 - Arrow keys: Move cursor in table
@@ -58,21 +59,7 @@ Press 'a' to close | 'q' to quit`
 
 // New creates a new demo 3 model
 func New() *Model {
-	// read in CSV data - try multiple paths for flexibility
-	csvPath := "../sample.csv"
-	f, err := os.Open(csvPath)
-	if err != nil {
-		// Try path from example/ directory (for demo-all)
-		csvPath = "sample.csv"
-		f, err = os.Open(csvPath)
-		if err != nil {
-			panic(err)
-		}
-	}
-	defer f.Close()
-
-	csvReader := csv.NewReader(f)
-	data, err := csvReader.ReadAll()
+	data, err := csv.NewReader(bytes.NewReader(sample.CSV)).ReadAll()
 	if err != nil {
 		panic(err)
 	}
@@ -107,7 +94,10 @@ func New() *Model {
 	).SetStyle(styleRow)
 	r2 := m.flexBox.NewRow().AddCells(
 		flexbox.NewCell(1, 5).SetStyle(style6),
-		flexbox.NewCell(10, 5).SetStyle(styleBlank),
+		// the table takes the size of its cell on every render
+		flexbox.NewCell(10, 5).SetStyle(styleBlank).SetContentGenerator(func(width, height int) string {
+			return m.table.SetWidth(width).SetHeight(height).Render()
+		}),
 		flexbox.NewCell(1, 5).SetStyle(style6),
 	).SetStyle(styleRow)
 	r3 := m.flexBox.NewRow().AddCells(
@@ -128,7 +118,7 @@ func New() *Model {
 func Run() {
 	m := New()
 	p := tea.NewProgram(m, tea.WithAltScreen())
-	if err := p.Start(); err != nil {
+	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)
 	}
@@ -147,8 +137,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.height = windowHeight
 		m.flexBox.SetWidth(windowWidth)
 		m.flexBox.SetHeight(windowHeight)
-		m.table.SetWidth(windowWidth)
-		m.table.SetHeight(windowHeight)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c", "q":
@@ -207,26 +195,21 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// filterWithStr edits the filter of the cursor's column: a letter or digit extends it and
+// backspace removes its last character.
 func (m *Model) filterWithStr(key string) {
-	i, s := m.table.GetFilter()
+	column, filter := m.table.GetFilter()
 	x, _ := m.table.GetCursorLocation()
-	if x != i && key != "backspace" {
+	switch {
+	case key != "backspace" && x != column:
 		m.table.SetFilter(x, key)
-		return
+	case key != "backspace":
+		m.table.SetFilter(column, filter+key)
+	case len(filter) > 1:
+		m.table.SetFilter(column, filter[:len(filter)-1])
+	case len(filter) == 1:
+		m.table.UnsetFilter()
 	}
-	if key == "backspace" {
-		if len(s) == 1 {
-			m.table.UnsetFilter()
-			return
-		} else if len(s) > 1 {
-			s = s[0 : len(s)-1]
-		} else {
-			return
-		}
-	} else {
-		s = s + key
-	}
-	m.table.SetFilter(i, s)
 }
 
 var aboutStyle = lipgloss.NewStyle().
@@ -237,19 +220,6 @@ var aboutStyle = lipgloss.NewStyle().
 
 // View implements tea.Model
 func (m *Model) View() string {
-	m.flexBox.ForceRecalculate()
-	_r := m.flexBox.GetRow(tableRowIndex)
-	if _r == nil {
-		panic("could not find the table row")
-	}
-	_c := _r.GetCell(tableCellIndex)
-	if _c == nil {
-		panic("could not find the table cell")
-	}
-	m.table.SetWidth(_c.GetWidth())
-	m.table.SetHeight(_c.GetHeight())
-	_c.SetContent(m.table.Render())
-
 	content := m.flexBox.Render()
 	if m.showAbout {
 		overlay := aboutStyle.Render(aboutText)
