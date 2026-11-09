@@ -1,8 +1,8 @@
 # Stickers 👾
 
 Stickers is a set of layout elements for terminal apps built with
-[Bubble Tea](https://github.com/charmbracelet/bubbletea) and styled with
-[Lip Gloss](https://github.com/charmbracelet/lipgloss). It ships two packages:
+[Bubble Tea](https://github.com/charmbracelet/bubbletea) v2 and styled with
+[Lip Gloss](https://github.com/charmbracelet/lipgloss) v2. It ships two packages:
 
 - `flexbox`: a responsive grid inspired by CSS flexbox. A `FlexBox` stacks rows
   of cells; a `HorizontalFlexBox` lines up columns of cells. Sizes come from
@@ -13,7 +13,7 @@ Stickers is a set of layout elements for terminal apps built with
 Both render only what changed since the last frame, so calling `Render` from
 every `View` is cheap. See [Performance](#performance).
 
-This module lives at `github.com/x85446/stickers`. It is a fork of
+This module lives at `github.com/x85446/stickers/v2`. It is a fork of
 [76creates/stickers](https://github.com/76creates/stickers).
 
 ![FlexBox with Table](.github/images/flex-box-with-table.gif)
@@ -37,16 +37,19 @@ This module lives at `github.com/x85446/stickers`. It is a fork of
 ## Install
 
 ```bash
-go get github.com/x85446/stickers@latest
+go get github.com/x85446/stickers/v2@latest
 ```
 
-The library requires Go 1.23 or later and depends on Lip Gloss v1
-(`github.com/charmbracelet/lipgloss`). It has no dependency on Bubble Tea: a
-box is a value that turns a size into a string, so it works with any Bubble Tea
-v1 release and outside Bubble Tea.
+The library requires Go 1.25 or later and takes Lip Gloss v2 styles
+(`charm.land/lipgloss/v2`). It has no dependency on Bubble Tea: a box is a
+value that turns a size into a string, so it works in a Bubble Tea v2 app and
+outside Bubble Tea.
+
+Version 1 of the module, `github.com/x85446/stickers`, takes Lip Gloss v1
+styles and serves apps on Bubble Tea v1.
 
 The package documentation, with runnable examples, is on
-[pkg.go.dev](https://pkg.go.dev/github.com/x85446/stickers).
+[pkg.go.dev](https://pkg.go.dev/github.com/x85446/stickers/v2).
 
 ## FlexBox
 
@@ -61,9 +64,9 @@ import (
 	"fmt"
 	"os"
 
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/x85446/stickers/flexbox"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
+	"github.com/x85446/stickers/v2/flexbox"
 )
 
 type model struct{ box *flexbox.FlexBox }
@@ -89,7 +92,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.box.SetWidth(msg.Width).SetHeight(msg.Height)
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if msg.String() == "q" || msg.String() == "ctrl+c" {
 			return m, tea.Quit
 		}
@@ -97,10 +100,14 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m model) View() string { return m.box.Render() }
+func (m model) View() tea.View {
+	view := tea.NewView(m.box.Render())
+	view.AltScreen = true
+	return view
+}
 
 func main() {
-	if _, err := tea.NewProgram(newModel(), tea.WithAltScreen()).Run(); err != nil {
+	if _, err := tea.NewProgram(newModel()).Run(); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}
@@ -172,7 +179,7 @@ whatever the rows and cells ask for.
 
 ### Content
 
-- `cell.SetContent(s)` sets static text.
+- `cell.SetContent(s)` sets static text. A tab shows as four spaces.
 - `cell.SetContentGenerator(func(w, h int) string)` builds the text each time
   the box renders. `w` and `h` are the area inside the border and margins,
   never less than 0, so the generator can lay out text for the space it has.
@@ -199,6 +206,8 @@ style is set; the grid owns sizes.
 - `NewCell(x, y, flexbox.WithStyle(style))` sets a cell style at creation.
 - `GetStyle()` returns the style set on the cell itself, without what a row or
   column passes down.
+- Styles render in full color. Bubble Tea fits the colors to the terminal;
+  outside Bubble Tea, print with `lipgloss.Println`, which does the same.
 
 ### Reading and changing the grid
 
@@ -282,7 +291,8 @@ flexbox.NewCell(3, 1).SetContentGenerator(func(w, h int) string {
 })
 
 flexbox.NewCell(3, 1).SetContentGenerator(func(w, h int) string {
-	m.viewport.Width, m.viewport.Height = w, h
+	m.viewport.SetWidth(w)
+	m.viewport.SetHeight(h)
 	return m.viewport.View()
 })
 ```
@@ -411,25 +421,21 @@ than the layout changes. Both packages are built for that:
 Content generators run on every render, so keep them cheap or cache what they
 compute.
 
-Text styled by an earlier render is reused as it is. Set the Lip Gloss color
-profile before the first render; after changing it at run time, set the styles
-again with `SetStyle` or `SetStyles`.
-
 Measured on an Apple M2 Pro with `make bench`, for a 160×48 grid of 17 cells
-and a 160×48 table:
+and a 160×48 table in its default colors:
 
 | Benchmark | Time per render |
 |---|---|
 | Grid, nothing changed | 0.4 µs, no allocation |
-| Grid, one cell's content changed | 30 µs |
-| Grid, resized, every cell rendered | 260 µs |
+| Grid, one cell's content changed | 35 µs |
+| Grid, resized, every cell rendered | 300 µs |
 | Table of 1,000 rows, nothing changed | 7 µs, no allocation |
-| The same table in a flexbox cell, nothing changed | 8 µs, no allocation |
-| Table, cursor moved one row | 23 µs |
-| Table of 100,000 rows, scrolled one row | 27 µs |
-| Table of 100,000 rows, cursor moved under a filter | 25 µs |
+| The same table in a flexbox cell, nothing changed | 7 µs, no allocation |
+| Table, cursor moved one row | 43 µs |
+| Table of 100,000 rows, scrolled one row | 43 µs |
+| Table of 100,000 rows, cursor moved under a filter | 41 µs |
 | Sort 10,000 rows | 0.8 ms |
-| Filter 100,000 rows and render | 2.3 ms |
+| Filter 100,000 rows and render | 2.5 ms |
 
 A box and a table are not safe for concurrent use. Bubble Tea runs `Update`
 and `View` on one goroutine, so a model needs no locking.
@@ -480,8 +486,8 @@ make check     # lint and test
 ```
 
 The repository holds two Go modules. The root module is the library: packages
-`flexbox` and `table`, which depend on Lip Gloss alone. The `example` module
-holds the demos and adds Bubble Tea and gocsv.
+`flexbox` and `table`, which depend on Lip Gloss and need Go 1.25. The
+`example` module holds the demos, adds Bubble Tea and gocsv, and needs Go 1.26.
 
 The tests cover:
 

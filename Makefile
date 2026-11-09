@@ -96,12 +96,12 @@ check: lint test  ## Run lint + test together
 install: install-dev  ## Alias for install-dev
 
 .PHONY: install-dev
-install-dev: build  ## Nothing to install: add the library with go get github.com/x85446/stickers
-	@echo "Nothing to install: stickers is a library. Add it with: go get github.com/x85446/stickers"
+install-dev: build  ## Nothing to install: add the library with go get github.com/x85446/stickers/v2
+	@echo "Nothing to install: stickers is a library. Add it with: go get github.com/x85446/stickers/v2"
 
 .PHONY: install-production
-install-production: build  ## Nothing to install: add the library with go get github.com/x85446/stickers
-	@echo "Nothing to install: stickers is a library. Add it with: go get github.com/x85446/stickers"
+install-production: build  ## Nothing to install: add the library with go get github.com/x85446/stickers/v2
+	@echo "Nothing to install: stickers is a library. Add it with: go get github.com/x85446/stickers/v2"
 
 .PHONY: uninstall
 uninstall:  ## Nothing to uninstall: the library installs no files

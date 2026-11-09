@@ -3,7 +3,10 @@
 All notable changes to this project will be documented in this file.
 ## Unreleased
 ### ⚠ BREAKING CHANGES
-- The demos are a Go module of their own, `github.com/x85446/stickers/example`. The library module requires Lip Gloss and nothing from Bubble Tea or gocsv.
+- The module is `github.com/x85446/stickers/v2` and takes Lip Gloss v2 styles from `charm.land/lipgloss/v2`. Version 1, `github.com/x85446/stickers`, stays on Lip Gloss v1. The library needs Go 1.25.
+- Styles render in full color whatever the terminal, as Lip Gloss v2 styles do. Bubble Tea v2 fits the colors to the terminal, and `lipgloss.Println` does outside it.
+- A tab in the content of a cell shows as four spaces, whatever tab width the style sets.
+- The demos are a Go module of their own, `github.com/x85446/stickers/example`, and run on Bubble Tea v2. The library module requires Lip Gloss and nothing from Bubble Tea or gocsv.
 - `Cell.GetStyle` returns the style set on the cell. A render no longer merges the keys a row or column passes down into it.
 - A row without lines takes no line of its box. It used to take one blank line, which pushed the rows under it out of a short box.
 - Table cells cut a value that is too wide and end it in `…`. They used to wrap it at a word and show the first line.
@@ -12,7 +15,6 @@ All notable changes to this project will be documented in this file.
 - `Table.SetTypes` returns an `ErrorRowLen` for a wrong number of types. The messages of the table's errors start with `table:`.
 - A minimum width or height holds next to fixed sizes that leave nothing. It used to drop to 0 there.
 - `SetRows` and `SetColumns` copy the slice they are given.
-- Lip Gloss v1.1.0 is the minimum version, up from v0.13.0.
 ### Fixes
 #### flexbox
 - Every setter takes effect on the next render. `SetWidth` or `SetHeight` alone on a box with a border, `LockRowHeight`, `LockColumnWidth`, `SetStyle` on a box, row or column, and setters on a cell kept from before the first render used to wait for another call to trigger a new layout.
@@ -27,7 +29,7 @@ All notable changes to this project will be documented in this file.
 - A cell is always its full width. A wide character that does not fit before the cell's edge used to leave the line one column short and shift the cells to its right.
 - Shares are computed with integers. Floating point rounding gave some cells one unit too few, such as each of 49 equal cells in 49 columns.
 - A content generator never receives a negative size, and a cell never gets one.
-- A cell breaks its content where Lip Gloss v1 breaks it. A leading space before a long word, wide characters that end at the cell's edge, and combining marks used to lose characters or blank the cell.
+- A cell wraps its content without losing any of it. A leading space before a long word, wide characters that end at the cell's edge, and combining marks used to lose characters or blank the cell. The cell wraps the content itself before Lip Gloss does, because the wrap inside Lip Gloss v2 breaks such lines too late.
 - Escape sequences in the content of a cell without a style are closed at every line end. A color used to run into the next cell.
 - Content with Windows line ends leaves no carriage return in a cell.
 - A bordered row too short for its cells closes its frame over its full width instead of two columns.
@@ -53,9 +55,9 @@ All notable changes to this project will be documented in this file.
 - A table rendered before `SetHeight` is the height given to `NewTable`, not one line taller.
 - After horizontal scrolling, rows size their cells with the ratios and minimum widths of the columns on screen, as the header does.
 ### Performance
-- `Render` reuses what did not change. A cell renders again only when its size, style or content changed, a row or column only when one of its cells did. On a 160×48 grid of 17 cells an unchanged render takes 0.4 µs instead of 1.8 ms and allocates nothing; a render after one cell's content changed takes 30 µs.
-- Rows, columns and boxes without a style are assembled directly instead of through a Lip Gloss style and join, which makes a full render after a resize about six times faster.
-- A table keeps the rows on screen between renders. A cursor move takes about 25 µs instead of 1 ms, also while scrolling and under a filter, and an unchanged table 7 µs.
+- `Render` reuses what did not change. A cell renders again only when its size, style or content changed, a row or column only when one of its cells did. On a 160×48 grid of 17 cells an unchanged render takes 0.4 µs instead of 1.8 ms and allocates nothing; a render after one cell's content changed takes 35 µs.
+- Rows, columns and boxes without a style are assembled directly instead of through a Lip Gloss style and join, which makes a full render after a resize about five times faster.
+- A table keeps the rows on screen between renders. A cursor move takes about 45 µs instead of 1 ms, also while scrolling and under a filter, and an unchanged table 7 µs.
 - Sorting is a stable O(n log n) sort in place instead of a bubble sort: 0.8 ms instead of 102 ms for 10,000 rows.
 - The filter runs when the filter or the rows change, not on every cursor move, and compares ASCII text without allocating.
 ### Features
@@ -85,8 +87,9 @@ All notable changes to this project will be documented in this file.
 - Benchmarks for rendering, sorting and filtering.
 - A golangci-lint configuration and a GitHub Actions workflow that tests and lints both modules.
 ### Dependencies
-- Updated `github.com/charmbracelet/lipgloss` to `v1.1.0` and `github.com/charmbracelet/x/ansi` to `v0.8.0`.
-- The demos use `github.com/charmbracelet/bubbletea` `v1.3.10`.
+- Lip Gloss is `charm.land/lipgloss/v2` `v2.0.6`, replacing `github.com/charmbracelet/lipgloss` `v0.13.0`.
+- Updated `github.com/charmbracelet/x/ansi` to `v0.11.8` and added `github.com/charmbracelet/x/cellbuf` `v0.0.15` for wrapping.
+- The demos use `charm.land/bubbletea/v2` `v2.1.1`, replacing `github.com/charmbracelet/bubbletea` `v1.1.1`.
 ## [v1.5.0](https://github.com/76creates/stickers/compare/v1.4.1...v1.5.0) (2025-09-29)
 ### ⚠ BREAKING CHANGES
 - `TableStyleKey` is now `StyleKey`, and names of the keys better reflect their purpose within their package

@@ -24,7 +24,7 @@ cmd_prereqs() {
     echo "Checking prerequisites..."
 
     if ! check_command go; then
-        echo "Error: Go 1.24 or later is required but not installed." >&2
+        echo "Error: Go 1.26 or later is required but not installed." >&2
         case "$(uname -s)" in
             Darwin) echo "Install it with: brew install go" >&2 ;;
             *)      echo "Install it from: https://go.dev/dl/" >&2 ;;
