@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 - The module is `github.com/x85446/stickers/v2` and takes Lip Gloss v2 styles from `charm.land/lipgloss/v2`. Version 1, `github.com/x85446/stickers`, stays on Lip Gloss v1. The library needs Go 1.25.
 - Styles render in full color whatever the terminal, as Lip Gloss v2 styles do. Bubble Tea v2 fits the colors to the terminal, and `lipgloss.Println` does outside it.
 - A tab in the content of a cell shows as four spaces, whatever tab width the style sets.
+- A content generator receives the room its content has, inside the cell's padding too. It used to receive the padding's columns and lines as well, so a generator that filled its area in a padded cell was wrapped.
 - The demos are a Go module of their own, `github.com/x85446/stickers/example`, and run on Bubble Tea v2. The library module requires Lip Gloss and nothing from Bubble Tea or gocsv.
 - `Cell.GetStyle` returns the style set on the cell. A render no longer merges the keys a row or column passes down into it.
 - A row without lines takes no line of its box. It used to take one blank line, which pushed the rows under it out of a short box.
@@ -35,7 +36,10 @@ All notable changes to this project will be documented in this file.
 - A bordered row too short for its cells closes its frame over its full width instead of two columns.
 - A nil row, column or cell, such as a getter returns for an index that is not there, is left out instead of causing a panic at the next render.
 - A hyperlink set on a cell, row or column stays in that element. It used to run on into the cells beside it on every line but the last.
-- A row, column or box that underlines or strikes through keeps its styled cells whole. Lip Gloss writes the two one rune at a time, which cut the cells' escape sequences apart.
+- A cell, row, column or box that underlines or strikes through keeps styled content whole and draws its line through it. Lip Gloss writes the two one rune at a time, which cut the escape sequences of colored or linked content apart and showed them as text.
+- Content that ends inside a color or a hyperlink takes no extra line, so it sits where plain content sits when it is centered or at the bottom.
+- A row whose frame alone is wider than its box is cut at the box's edge and leaves the other rows in place.
+- A content generator that reads its cell's position gets the position of the render it runs in, from the first render on.
 - `Render` returns exactly the box's height in lines and width in columns for every size and style.
 #### table
 - `SetFilter`, `OrderByAsc` and `OrderByDesc` ignore a negative index. They used to panic.
@@ -51,6 +55,7 @@ All notable changes to this project will be documented in this file.
 - A table without columns renders. It used to panic.
 - `SetWidth` with the width the table already has changes nothing. It used to choose the visible columns again from the cursor's column, which scrolled a table that is sized on every render.
 - The table is its size whatever frame the footer's style has; a border or padding on it used to add lines.
+- A table without width renders the number of lines of its current height.
 - A value is cut to the room its cell has: the padding of the cursor cell's style, tabs and Windows line ends are counted, so a cut value always ends in `…`.
 - `int64` columns are accepted by `SetTypes` and `AddRows`, as `Ordered` always listed them.
 - `SetStyles` overrides apply to that table only; the package defaults and other tables keep their styles.
@@ -59,12 +64,12 @@ All notable changes to this project will be documented in this file.
 ### Performance
 - `Render` reuses what did not change. A cell renders again only when its size, style or content changed, a row or column only when one of its cells did. On a 160×48 grid of 17 cells an unchanged render takes 0.5 µs instead of 1.8 ms and allocates nothing; a render after one cell's content changed takes 35 µs.
 - Rows, columns and boxes without a style are assembled directly instead of through a Lip Gloss style and join, which makes a full render after a resize about five times faster.
-- A table keeps the rows on screen between renders. A cursor move takes about 45 µs instead of 1 ms, also while scrolling and under a filter, and an unchanged table 8 µs.
+- A table keeps the rows on screen between renders. A cursor move takes about 45 µs instead of 1 ms, also while scrolling and under a filter, and an unchanged table 10 µs.
 - Sorting is a stable O(n log n) sort in place instead of a bubble sort: 0.8 ms instead of 102 ms for 10,000 rows.
 - The filter runs when the filter or the rows change, not on every cursor move, and compares ASCII text without allocating.
 ### Features
 - Positions and hit testing. `GetBounds` on a cell, row or column returns its rectangle in the box, `Cell.GetContentBounds` the rectangle inside the cell's border and margins, and `CellAt` on a box the cell that shows at a point. A mouse click finds its cell, and the terminal's cursor finds its place in one.
-- Mouse support for the table. `ColumnAt` and `RowAt` turn a position on the rendered table into a column and a row, and `SetCursorLocation` moves the cursor to them.
+- Mouse support for the table. `CellAt` turns a position on the rendered table into a column and a row, `ColumnAt` names the header at a position and `RowAt` the row on a line, and `SetCursorLocation` moves the cursor.
 - The cell setters apply in both boxes. In a `FlexBox`, `SetMinHeight` on a cell sets the minimum height of its row. In a `HorizontalFlexBox`, `SetFixedHeight` on a cell pins its height, and `SetFixedWidth` and `SetMinWidth` set the width of its column.
 - `Column.SetFixedWidth` pins a column, as `Row.SetFixedHeight` pins a row.
 - `Table.GetCursorRow` returns the values of the row under the cursor.

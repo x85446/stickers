@@ -182,14 +182,17 @@ whatever the rows and cells ask for.
 
 - `cell.SetContent(s)` sets static text. A tab shows as four spaces.
 - `cell.SetContentGenerator(func(w, h int) string)` builds the text each time
-  the box renders. `w` and `h` are the area inside the border and margins,
-  never less than 0, so the generator can lay out text for the space it has.
-  Padding, if the style has any, is inside that area. A cell without columns
-  or lines does not call its generator.
+  the box renders. `w` and `h` are the room the content has, inside the cell's
+  margins, border and padding, never less than 0, so the generator can lay out
+  text for the space it has. A cell without columns or lines does not call its
+  generator.
 - `cell.GetWidth()` and `cell.GetHeight()` return the full allocated size,
   including the frame.
 - Content keeps its alignment: the style's horizontal and vertical alignment
   place it, and trailing spaces count as part of a line.
+- Content can carry its own colors and hyperlinks. They end with the cell on
+  every line, and a cell or row that underlines or strikes through draws its
+  line through styled content too.
 
 ### Styles
 
@@ -234,8 +237,8 @@ lines from the top left corner of the box.
 
 - `GetBounds()` on a cell, row or column returns its rectangle, frame included,
   as an `image.Rectangle`.
-- `cell.GetContentBounds()` returns the rectangle inside the cell's border and
-  margins, the area a content generator fills.
+- `cell.GetContentBounds()` returns the rectangle the content has, inside the
+  cell's margins, border and padding: the area a content generator fills.
 - `box.CellAt(x, y)` returns the cell that shows at a point, or `nil` on a
   frame, in a blank, or outside the box.
 
@@ -425,12 +428,13 @@ s := t.Render()
   count over the rows the filter keeps, in sorted order; without rows the
   value is `""` and the row `nil`. While a filter hides the cursor's row the
   cursor sits on the last row, and it is back on its row when the row is.
-- **Mouse.** `ColumnAt(x)` returns the column at a column of the rendered
-  table and `RowAt(y)` the row at one of its lines; both are false where there
-  is none. `SetCursorLocation(column, row)` moves the cursor there and scrolls
-  to it. A click on line 0 is on the header, so `ColumnAt` gives the column to
-  sort by. A table that does not start at the top left corner of the screen
-  has its position to subtract first.
+- **Mouse.** `CellAt(x, y)` returns the column and the row of the cell at a
+  position on the rendered table, and false where there is none.
+  `SetCursorLocation(column, row)` moves the cursor there and scrolls to it. A
+  click on line 0 is on the header: `ColumnAt(x)` gives the column whose
+  header shows there, the column to sort by. `RowAt(y)` gives the row on a
+  line. A table that does not start at the top left corner of the screen has
+  its position to subtract first.
 - **Horizontal scrolling.** Columns are shown while their minimum widths fit
   the table width; moving the cursor past the visible range scrolls.
   `GetVisibleColumnRange` returns the first and last visible column. With all
@@ -482,8 +486,8 @@ and a 160×48 table in its default colors:
 | Grid, nothing changed | 0.5 µs, no allocation |
 | Grid, one cell's content changed | 35 µs |
 | Grid, resized, every cell rendered | 300 µs |
-| Table of 1,000 rows, nothing changed | 8 µs, no allocation |
-| The same table in a flexbox cell, nothing changed | 9 µs, no allocation |
+| Table of 1,000 rows, nothing changed | 10 µs, no allocation |
+| The same table in a flexbox cell, nothing changed | 10 µs, no allocation |
 | Table, cursor moved one row | 45 µs |
 | Table of 100,000 rows, scrolled one row | 45 µs |
 | Table of 100,000 rows, cursor moved under a filter | 43 µs |
