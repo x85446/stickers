@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project will be documented in this file.
-## Unreleased
+## [2.0.0] - 2026-11-11
 ### ⚠ BREAKING CHANGES
 - The module is `github.com/x85446/stickers/v2` and takes Lip Gloss v2 styles from `charm.land/lipgloss/v2`. Version 1, `github.com/x85446/stickers`, stays on Lip Gloss v1. The library needs Go 1.25.
 - Styles render in full color whatever the terminal, as Lip Gloss v2 styles do. Bubble Tea v2 fits the colors to the terminal, and `lipgloss.Println` does outside it.
